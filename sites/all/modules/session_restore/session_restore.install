@@ -1,0 +1,42 @@
+<?php
+
+/**
+ * Implements hook_install().
+ */
+function session_restore_install() {
+  $t = get_t();
+  drupal_set_message($t('Session restore module: Installation script complete.'));
+}
+
+/**
+ * Implements hook_schema().
+ */
+function session_restore_schema() {
+  $schema['session_restore'] = array(
+    'description' => 'Stores session variables for later restoration.',
+    'fields' => array(
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'Primary key: {users}.uid for user.'
+      ),
+      'session' => array(
+        'type' => 'text',
+        'size' => 'big',
+        'description' => 'Store serialised user session for later retrieval.'
+      )
+    ),
+    'primary key' => array('uid')
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function session_restore_uninstall() {
+  $t = get_t();
+  drupal_set_message($t('Session restore module: Uninstallation script complete.'));
+}

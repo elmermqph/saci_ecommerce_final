@@ -1,0 +1,472 @@
+<?php
+
+/**
+ *Author by: Regie Jose.
+ *Create date: January 21, 2013
+ *Purpose: This module provide a new shipping method and shipping rate (depends on the location), 
+ *
+ * But for now. It's a fix rate. Just for Testing Only.
+ * 
+ * Required Module: ubercart
+ * 					-> uc_quote
+ **/
+
+
+/*
+ * Implement hook_permission
+ *
+ */
+function sandcart_permission(){
+	return array(
+		'sandcart quote' => array(
+			'title' => t('Access Sandcart Quote'),
+			'description' => 'Permission to access sandcart quote.',
+		),
+	);
+}
+
+
+/*
+ * Implement hook_menu
+ *
+ */
+function sandcart_menu(){
+	$items['admin/store/settings/quotes/settings/sandcart'] = array(
+		'title' => 'Sandcart Quote Settings', 
+		'description' => 'Sandcart Quote Settings',
+		'page callback' => '_sandcart_quote_settings',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('sandcart quote'),
+		'file' => 'inc/sandcart.admin.inc',
+	);
+	$items['sandcart/ajax'] = array(
+		'title' => '',
+		'description' => '',
+		'page callback' => 'sandcart_json_ajax',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('access content'),
+		'file' => 'inc/json.pages.inc',
+	);
+	
+	$items['dashboard/location/import'] = array(
+		'title' => 'Import', 
+		'description' => 'Import Location via CSV',
+		'page callback' => '_sandcart_import_location',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('sandcart quote'),
+		'file' => 'inc/sandcart.location.pages.inc',
+	);
+	
+	$items['dashboard/location/export'] = array(
+		'title' => 'Export', 
+		'description' => 'Export Location to CSV',
+		'page callback' => '_sandcart_export_location',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('sandcart quote'),
+		'file' => 'inc/sandcart.location.pages.inc',
+	);
+
+	
+	return $items;
+}
+
+
+/******************************************************************************
+ * Node Hooks                                                             *
+ ******************************************************************************/
+
+/**
+ * Implements hook_node_insert().
+ */
+function sandcart_node_insert($node) {
+	if($node->type=="shipping_rate"){
+		saci_rate_term_save($node);
+	}
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function sandcart_node_update($node) {
+	if($node->type=="shipping_rate"){
+		saci_rate_term_save($node);
+	}
+}
+
+
+function saci_rate_term_save($node){
+	foreach($node->field_appliances_category[$node->language] as $taxterm){
+		$termsave = taxonomy_term_load($taxterm['tid']);
+		$termsave->field_shipping_rate_price['und'][0]['value'] = $node->field_shipping_rate[$node->language][0]['value'];		// SA - Intracity
+		$termsave->field_sa_rate['und'][0]['value'] = $node->field_sa_sa_rate[$node->language][0]['value'];					// SA - SA
+		$termsave->field_otd_rate['und'][0]['value'] = $node->field_term_otd_rate[$node->language][0]['value'];				// OTD
+		taxonomy_term_save($termsave);
+	}
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Adds package type to products.
+ *
+ * @see uc_product_form()
+ */
+function sandcart_form_alter(&$form, &$form_state, $form_id) {
+  if (uc_product_is_product_form($form)) {
+    $node = $form['#node'];
+
+    $enabled = variable_get('uc_quote_enabled', array()) + array('saci' => FALSE);
+    $weight = variable_get('uc_quote_method_weight', array()) + array('saci' => 0);
+
+    $saci = array(
+      '#type' => 'fieldset',
+      '#title' => t('Sandcart Saci'),
+      '#collapsible' => TRUE,
+      '#collapsed' => ($enabled['saci'] == FALSE ),
+      '#weight' => $weight['saci'],
+      '#tree' => TRUE,
+    );
+    $saci['pkg_type'] = array(
+      '#type' => 'select',
+      '#title' => t('Package type'),
+      '#options' => _sandcart_pkg_types(),
+      '#default_value' => isset($node->saci['pkg_type']) ? $node->saci['pkg_type'] : 'Saci',
+    );
+
+    $form['shipping']['saci'] = $saci;
+  }
+}
+
+/*
+ * Option for Package Type
+ */
+function _sandcart_pkg_types() {
+  return array(
+    'Saci' => t('Saci'),
+  );
+}
+
+
+
+
+/******************************************************************************
+ * Ubercart Hooks                                                             *
+ ******************************************************************************/
+
+/**
+ * Implements hook_uc_shipping_type().
+ */
+function sandcart_uc_shipping_type() {
+  $weight = variable_get('uc_quote_type_weight', array('Saci' => 0));
+
+  $types = array();
+  $types['Saci'] = array(
+    'id' => 'Saci',
+    'title' => t('Delivery Rate'),
+    'weight' => $weight['Saci'],
+  );
+
+  return $types;
+}
+
+/**
+ * Implements hook_uc_shipping_method().
+ */
+function sandcart_uc_shipping_method() {
+	$methods['sandcart_saci'] = array(
+      'id' => 'sandcart_saci',
+      'module' => 'sandcart',
+      'title' => 'Delivery Rate',
+      'description' => t('Saci Shipping method'),
+      'operations' => array(
+      'configure' => array(
+			'title' => t('configure'),
+			'href' => 'admin/store/settings/quotes/settings/sandcart',
+			),
+		),
+      'quote' => array(
+        'type' => 'order',
+        'callback' => 'sandcart_quote',
+        'accessorials' => array(
+          'Delivery Rate',
+        ),
+      ),
+      'enabled' => TRUE,
+    );
+	
+	return $methods;
+}
+
+/**
+ * Implements hook_quote
+ */
+function sandcart_quote($products, $details, $method) {
+	$order_id = !empty($_SESSION['cart_order']) ? intval($_SESSION['cart_order']) : 0;
+	$qry = "SELECT COUNT(*) FROM {sandcart_saci_delivery} WHERE order_id = :order_id";
+	$qry_order_id = db_query($qry,array(':order_id' => $order_id))->fetchField();
+	
+	if($qry_order_id == 0){
+		$fRate = 0.00;
+		$vCharge = 0.00;
+		$delRate = 0.00;
+		$insert_bdo_seq = db_insert('sandcart_saci_delivery')
+			->fields(array(
+				'order_id' => $order_id,
+				'fRate' => $fRate,
+				'vCharge' => $vCharge,
+				'delRate' => $delRate,
+			))->execute();
+	}
+	
+	
+	if(!empty($details['street2'])){
+		//dsm($products);
+		
+		$delivery_status = delivery_status($details['city'],$details['street2']);
+		switch($delivery_status){
+			case 0:{
+				// OSA
+				$quotes[] = array(
+					'rate' => 0,
+					'label' => 'Delivery Rate',
+					'option_label' => 'Delivery Rate',
+				);
+				return $quotes;	
+				break;
+			}
+			case 1:{
+				// SA
+				$quotes[] = array(
+					'rate' => saci_sa_sa_rate($products,$order_id),
+					'label' => 'Delivery Rate',
+					'option_label' => 'Delivery Rate',
+				);
+				return $quotes;	
+				break;
+			}
+			case 2:{
+				// OTD
+				$quotes[] = array(
+					'rate' => saci_otd_rate($products,$order_id),
+					'label' => 'Delivery Rate',
+					'option_label' => 'Delivery Rate',
+				);
+				return $quotes;	
+				break;
+			}
+			case 3:{
+				if($details['zone'] == 405){
+					// intracity apply in Metro Manila only
+					$quotes[] = array(
+						'rate' => saci_sa_intracity_rate($products,$order_id),
+						'label' => 'Delivery Rate',
+						'option_label' => 'Delivery Rate',
+					);
+					return $quotes;
+				}else{
+					// 
+					$quotes[] = array(
+						'rate' => saci_sa_sa_rate($products,$order_id),
+						'label' => 'Delivery Rate',
+						'option_label' => 'Delivery Rate',
+					);
+					return $quotes;	
+				}
+				break;
+			}
+			default:{
+				return array();
+			}
+		}
+	}else{
+		return array();
+	}
+	return array();
+}
+
+
+
+function delivery_status($city = '', $brgy = ''){
+	if(!empty($city)){
+		$del_city = db_query("SELECT id FROM {uc_zones_municipality} WHERE municipality_name = :municipality_name",array(":municipality_name" => $city))->fetchField();
+		$brgy_qry = "SELECT delivery_status FROM {uc_zones_barangay} WHERE barangay_name = :barangay_name AND uz_municipality = :uz_municipality";
+		$status = db_query($brgy_qry,array(":barangay_name" => $brgy,"uz_municipality" => $del_city))->fetchField();
+		return $status;
+	}
+	return '0';
+}
+
+
+function saci_otd_rate($products,$order_id){
+	$cat = array();
+	$hRate = 0;
+	$vCharge = 0;
+	$delCharge = 0;
+	$total_qty = 0;
+	$TDVal = 0;
+	$vat = (variable_get('sandcart_saci_vat','12') / 100) + 1;;
+	$valuation = variable_get('sandcart_saci_valuation','1') / 100;
+	
+	foreach($products as $item){
+		$cat = taxonomy_term_load($item->field_appliance_category['und'][0]['tid']);
+		$rate = $cat->field_otd_rate['und'][0]['value'];
+		
+		if($rate > $hRate){
+			$hRate = $rate;
+		}
+		
+		$TDVal += ($item->price * $item->qty);
+	}
+	
+	if($TDVal > 5000){
+		$vCharge = ($TDVal - 5000) * $valuation * $vat;
+		$delCharge = $hRate + $vCharge;
+		
+		$num_updated = db_update('sandcart_saci_delivery')
+			->fields(array(
+				'fRate' => $hRate,
+				'vCharge' => $vCharge,
+				'delRate' => $delCharge
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}else{
+		$delCharge = $hRate;
+		$num_updated = db_update('sandcart_saci_delivery')
+			->fields(array(
+				'fRate' => $hRate,
+				'vCharge' => 0,
+				'delRate' => 0
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}
+	return $delCharge;
+//		$dim = ($item->price * $item->qty);
+//		if($dim > $hDim){
+//			$hDim = $dim;
+//			$cat = taxonomy_term_load($item->field_appliance_category['und'][0]['tid']);
+//			$rate = $cat->field_otd_rate['und'][0]['value'];
+//			$RpIP = $rate + $item->price;
+//		}
+
+//		$total_qty += $item->qty;
+//	}
+	
+//	if($TDVal >= 5000){
+//		$valuation_charge = ($TDVal - $RpIP) * $valuation * $vat;
+//		$otdCharge = $rate + $valuation_charge;
+//		return $otdCharge;
+//	}else{
+//		return $rate;
+//	}
+	
+	
+//	if($total_qty == 1){
+//		if($TDVal >= 5000){
+//			$valuation_charge = ($TDVal - $RpIP) * $valuation * $vat;
+//			$otdCharge = $rate + $valuation_charge;
+//			return $otdCharge;
+//		}else{
+//			return $rate;
+//		}
+//	}else{
+//		$valuation_charge = ($TDVal - $RpIP) * $valuation * $vat;
+//		$tCharge = $rate + $valuation_charge;
+//		return $tCharge;
+//	}
+}
+
+
+function saci_sa_sa_rate($products,$order_id){
+	$cat = array();
+	$hRate = 0;
+	$vCharge = 0;
+	$delCharge = 0;
+	$total_qty = 0;
+	$TDVal = 0;
+	$vat = (variable_get('sandcart_saci_vat','12') / 100) + 1;;
+	$valuation = variable_get('sandcart_saci_valuation','1') / 100;
+	
+	foreach($products as $item){
+		$cat = taxonomy_term_load($item->field_appliance_category['und'][0]['tid']);
+		$rate = $cat->field_sa_rate['und'][0]['value'];
+		if($rate > $hRate){
+			$hRate = $rate;
+		}
+		$TDVal += ($item->price * $item->qty);
+	}
+	
+	if($TDVal > 5000){
+		$vCharge = ($TDVal - 5000) * $valuation * $vat;
+		$delCharge = $hRate + $vCharge;
+		
+		$num_updated = db_update('sandcart_saci_delivery')
+			->fields(array(
+				'fRate' => $hRate,
+				'vCharge' => $vCharge,
+				'delRate' => $delCharge
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}else{
+		$delCharge = $hRate;
+		$num_updated = db_update('sandcart_saci_delivery')
+			->fields(array(
+				'fRate' => $hRate,
+				'vCharge' => 0,
+				'delRate' => 0
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}
+	return $delCharge;
+}
+
+
+function saci_sa_intracity_rate($products,$order_id){
+	$cat = array();
+	$hRate = 0;
+	$vCharge = 0;
+	$delCharge = 0;
+	$total_qty = 0;
+	$TDVal = 0;
+	$vat = (variable_get('sandcart_saci_vat','12') / 100) + 1;;
+	$valuation = variable_get('sandcart_saci_valuation','1') / 100;
+	
+	foreach($products as $item){
+		$cat = taxonomy_term_load($item->field_appliance_category['und'][0]['tid']);
+		$rate = $cat->field_shipping_rate_price['und'][0]['value'];
+		if($rate > $hRate){
+			$hRate = $rate;
+		}
+		$TDVal += ($item->price * $item->qty);
+	}
+	if($TDVal > 5000){
+		$vCharge = ($TDVal - 5000) * $valuation * $vat;
+		$delCharge = $hRate + $vCharge;
+		
+		$num_updated = db_update('sandcart_saci_delivery')
+			->fields(array(
+				'fRate' => $hRate,
+				'vCharge' => $vCharge,
+				'delRate' => $delCharge
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}else{
+		$delCharge = $hRate;
+		$num_updated = db_update('sandcart_saci_delivery')
+			->fields(array(
+				'fRate' => $hRate,
+				'vCharge' => 0,
+				'delRate' => 0
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}
+	return $delCharge;
+}
+
+
+

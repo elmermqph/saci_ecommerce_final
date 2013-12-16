@@ -1,0 +1,915 @@
+<?php
+/**
+ * Define Common errors during checkout
+ */
+define('UC_HSBC_MIGS_ERROR_GENERAL_ERROR',   'Problem Encountered');
+define('UC_HSBC_MIGS_ERROR_VALIDATION',    'Transaction could not be validated');
+define('UC_HSBC_MIGS_ERROR_NOT_PROCESSED', 'Transaction could not be processed');
+define('UC_HSBC_MIGS_ERROR_NOT_FOUND',     'Order could not be found');
+
+/**
+ * Define Return Errors
+ */
+define('UC_HSBC_MIGS_SUCCESS', 1);
+define('UC_HSBC_MIGS_BADHASH', 2);
+define('UC_HSBC_MIGS_NOHASH', 4);
+define('UC_HSBC_MIGS_NOORDER', 8);
+define('UC_HSBC_MIGS_ORDERPOSTCHECKOUT', 16);
+define('UC_HSBC_MIGS_NOTYINCHECKOUT', 32);
+define('UC_HSBC_MIGS_PAYMENT_ERROR', 64);
+
+/*
+ * Test mode
+ */
+define('UC_HSBC_MIGS_SELECT_RETURN_CODES', 'Allow selection of return codes at checkout.');
+
+define('UC_HSBC_MIGS_VPC_URL', 'https://migs.mastercard.com.au/vpcpay');
+
+/**
+ * Implementation of hook_theme()
+ */
+function uc_hsbc_migs_theme() {
+  return array(
+    'uc_hsbc_migs_order_incomplete' => array(
+      'variables' => array(
+        'response_message'   => '',
+        'response_receiptno' => '',
+        'order_info'         => '',
+        'order'              => NULL,
+      ),
+      'template'  => 'uc-hsbc-migs-order-incomplete',
+    ),
+    'uc_hsbc_migs_cc_logo' => array(
+      'variables' => array(
+        'id' => '',
+        'alt'  => '',
+      ),
+    ),
+    'uc_hsbc_migs_cc_logos' => array(
+      'variables' => array(
+        'logos' => array(),
+      ),
+    ),
+    'uc_hsbc_migs_method_title' => array(
+      'variables' => array(
+        'title' => '',
+      ),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function uc_hsbc_migs_menu() {
+  $items['cart/hsbc-migs/complete'] = array(
+    'title' => 'Order complete',
+    'page callback' => 'uc_hsbc_migs_complete',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+  $items['admin/store/reports/hsbc-migs/view-codes'] = array(
+    'title' => 'Display response codes',
+    'page callback' => 'uc_hsbc_migs_response_codes',
+    'access arguments' => array('fulfill orders'),
+  );
+  return $items;
+}
+
+function uc_hsbc_migs_response_codes(){
+	$items = array();
+  $result = db_query("SELECT * FROM {uc_hsbc_migs}");
+  foreach ($result as $row) {
+    $items['uc_hsbc_migs'][] = $row;
+  }
+  $result = db_query("SELECT * FROM {uc_hsbc_migs_statuses}");
+  foreach ($result as $row) {
+    $items['uc_hsbc_migs_statuses'][] = $row;
+  }
+
+	return print_r($items, true);
+}
+
+/**
+ * Implementation of hook_form_FORM_ID_alter().
+ */
+function uc_hsbc_migs_form_uc_cart_checkout_review_form_alter(&$form, &$form_state, $form_id) {
+  if (($order_id = intval($_SESSION['cart_order'])) > 0) {
+    $order = uc_order_load($order_id);
+
+    if ($order->payment_method == 'hsbc_migs') {
+      unset($form['actions']['submit']);
+      $form['actions']['hsbc_migs_submit'] = drupal_get_form('uc_hsbc_migs_form', $order);
+    }
+  }
+}
+
+/**
+ * Implementation of hook_form_FORM_ID_alter().
+ */
+function uc_hsbc_migs_form_uc_payment_methods_form_alter(&$form, &$form_state, $form_id) {
+//	drupal_set_message(print_r($form, true));
+  if (isset($form['method_hsbc_migs']['#collapsed'])) {
+    $form['method_hsbc_migs']['#collapsed'] = FALSE;
+  }
+}
+
+
+/*******************************************************************************
+ * Hook Functions (Ubercart)
+ ******************************************************************************/
+
+/**
+ * Implementation of hook_uc_payment_method().
+ */
+function uc_hsbc_migs_uc_payment_method() {
+  $title = theme('uc_hsbc_migs_method_title',
+								 array('title' => variable_get('uc_hsbc_migs_method_title', t('Credit card on a secure server.'))));
+  $methods[] = array(
+    'id' => 'hsbc_migs',
+    'name' => t('HSBC MIGS Payment Gateway'),
+    'title' => $title,
+    'review' => variable_get('uc_hsbc_migs_check', FALSE) ? t('Credit card/eCheck') : t('Credit card'),
+    'desc' => t('Redirect to MIGS to pay by credit card or eCheck.'),
+    'callback' => 'uc_payment_method_hsbc_migs',
+    'weight' => 3,
+    'checkout' => TRUE,
+    'backend' => TRUE,
+  );
+
+  return $methods;
+}
+
+
+/*******************************************************************************
+ * Callback Functions, Forms, and Tables
+ ******************************************************************************/
+
+/**
+ * Callback for MIGS payment method settings.
+ */
+function uc_payment_method_hsbc_migs($op, &$arg1) {
+  switch ($op) {
+    case 'settings':
+			// Put fieldsets into vertical tabs
+			$form['hsbc-migs-settings'] = array(
+				'#type' => 'vertical_tabs',
+//				'#attached' => array(
+//					'js' => array(
+//						'vertical-tabs' => drupal_get_path('module', 'uc_xend') . '/uc_hsbc_migs.admin.js',
+//					),
+//				),
+			);
+      $form['url'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Virtual Payment Client'),
+        '#collapsible' => TRUE,
+				'#collapsed' => !variable_get('uc_hsbc_migs_vpc_url', FALSE),
+				'#group' => 'hsbc-migs-settings',
+      );
+      $form['url']['uc_hsbc_migs_vpc_url'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Virtual Payment Client URL'),
+        '#description' => t('Change this URL only if the post url has been change. See documentation'),
+        '#default_value' => variable_get('uc_hsbc_migs_vpc_url', UC_HSBC_MIGS_VPC_URL),
+        '#size' => 64,
+      );
+      $form['merchant'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Merchant Details'),
+        '#collapsible' => TRUE,
+        '#collapsed' => variable_get('uc_hsbc_migs_vpc_mid', FALSE),
+				'#group' => 'hsbc-migs-settings',
+      );
+      $form['merchant']['uc_hsbc_migs_vpc_mid'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Merchant Id'),
+        '#description' => t('Your MIGS merchant id.'),
+        '#default_value' => variable_get('uc_hsbc_migs_vpc_mid', ''),
+        '#size' => 16,
+      );
+      $form['merchant']['uc_hsbc_migs_vpc_access_code'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Access code'),
+        '#description' => t('The access code is provided to you when you registered your merchant profile.'),
+        '#default_value' => variable_get('uc_hsbc_migs_vpc_access_code', ''),
+        '#size' => 16,
+      );
+      $form['merchant']['uc_hsbc_migs_secure_secret'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Secure hash secret'),
+        '#description' => t('The secure hash secret is used to check the integrity of the transaction request.'),
+        '#default_value' => variable_get('uc_hsbc_migs_secure_secret', ''),
+        '#size' => 50,
+      );
+      $form['interface'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Interface'),
+				'#group' => 'hsbc-migs-settings',
+      );
+      $form['interface']['uc_hsbc_migs_method_title'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Payment method title'),
+        '#default_value' => variable_get('uc_hsbc_migs_method_title', t('Credit card on a secure server:')),
+        '#description' => t('Label on !checkout_link when selecting payment method.', array('!checkout_link' => l('checkout screen', 'cart/checkout'))),
+      );
+      $form['interface']['uc_hsbc_migs_checkout_button'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Button text on transaction review page'),
+        '#description' => t('Button text on !review_link which redirects to MIGS for payment.', array('!review_link' => l('review screen', 'cart/checkout/review'))),
+        '#default_value' => variable_get('uc_hsbc_migs_checkout_button', t('Submit Order')),
+      );
+      $form['interface']['uc_hsbc_migs_vpc_locale'] = array(
+        '#type' => 'select',
+        '#title' => t('MIGS Locale'),
+        '#description' => t('Preferred language to display MIGS interface in.'),
+        '#options' => array(
+          'en' => t('English'),
+        ),
+        '#default_value' => variable_get('uc_hsbc_migs_vpc_locale', 'en'),
+      );
+
+      $form['interface']['payment'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Payment Option'),
+				'#group' => 'hsbc-migs-settings',
+      );
+      $form['interface']['payment']['uc_hsbc_migs_check'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Allow eCheck payment'),
+        '#default_value' => variable_get('uc_hsbc_migs_check', FALSE),
+        '#description' => 'Determine if check payment is allowed.',
+      );
+
+      $form['interface']['icons'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Payment Logo'),
+				'#group' => 'hsbc-migs-settings',
+      );
+			$card_types = array();
+			foreach (_uc_hsbc_migs_card_types() as $card=>$card_logo){
+				$themed_logo = theme('uc_hsbc_migs_cc_logo', array('id' => $card, 'alt' => $card_logo));
+//				$logos[] = $themed_logo;
+				$card_types[$card] = $themed_logo;
+			}
+			
+			if (isset($logos)){
+				$icon_description[] = theme('uc_hsbc_migs_cc_logos', array('logos' => $logos));
+			}
+      $icon_description[] = '<div style="clear:both;">' .
+			                       t("You can change the logo by uploading images to the active theme. !imageurl",
+															 array('!imageurl'=>'Sample: <strong>uc_hsbc_migs/&lt;CARD_NAME&gt;.gif</strong>')
+															) .
+														 '</div>';
+
+      $form['interface']['icons']['#description'] = implode('', $icon_description);
+
+      $form['interface']['icons']['uc_hsbc_migs_method_title_display_icons'] = array(
+        '#type' => 'checkboxes',
+        '#title' => 'Select which image to display',
+        '#options' => $card_types,
+        '#default_value' => variable_get('uc_hsbc_migs_method_title_display_icons', array()),
+      );
+      $form['dev'] = array(
+        '#type' => 'fieldset',
+        '#title' => 'Development Mode',
+        '#description' => '<strong style="color:#FF0000;">Do not enable if accepting live transactions.</strong>',
+				'#group' => 'hsbc-migs-settings',
+      );
+      $form['dev']['uc_hsbc_migs_select_transaction_results'] = array(
+        '#type' => 'checkbox',
+        '#title' => t(UC_HSBC_MIGS_SELECT_RETURN_CODES),
+        '#default_value' => variable_get('uc_hsbc_migs_select_transaction_results', FALSE),
+        '#description' => 'Only use in VPC test gateway',
+      );
+      return $form;
+  }
+}
+
+/**
+ * Form to build the submission to MIGS server
+ */
+function uc_hsbc_migs_form($form, &$form_state, $order) {
+  $vpc_Amount = round($order->order_total * 100);
+  $vpc_OrderInfo = $order->order_id;
+  $vpc_MerchTxnRef = $vpc_OrderInfo . '_' . time();
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t(variable_get('uc_hsbc_migs_checkout_button', 'Submit Order')),
+  );
+  $data = array(
+    'vpc_MerchTxnRef' => $vpc_MerchTxnRef,
+    'vpc_OrderInfo' => $vpc_OrderInfo,
+    'vpc_Amount' => $vpc_Amount,
+  );
+  foreach ($data as $name => $value) {
+    $form[$name] = array(
+      '#type' => 'value',
+      '#value' => $value
+    );
+  }
+	$testing = substr(variable_get('uc_hsbc_migs_vpc_mid',''), 0, 4);
+  if (variable_get('uc_hsbc_migs_select_transaction_results', FALSE) && (strtoupper($testing) == 'TEST')) {
+    _uc_hsbc_migs_select_transaction_results($form['vpc_Amount']);
+  }
+  return $form;
+}
+
+/**
+ * Submit form and redirect to MIGS
+ */
+function uc_hsbc_migs_form_submit($form, &$form_state) {
+  $args = array('vpc_AccessCode'  => variable_get('uc_hsbc_migs_vpc_access_code', ''),
+								'vpc_Amount'      => $form_state['values']['vpc_Amount'],
+								'vpc_Command'			=> 'pay',
+								'vpc_Locale'      => variable_get('uc_hsbc_migs_vpc_locale', 'en'),
+								'vpc_Merchant'    => variable_get('uc_hsbc_migs_vpc_mid', ''),
+								'vpc_OrderInfo'   => $form_state['values']['vpc_OrderInfo'],
+								'vpc_ReturnURL'   => url('cart/hsbc-migs/complete/'. uc_cart_get_id(), array('absolute' => TRUE)),
+								'vpc_Version'     => variable_get('uc_hsbc_migs_vpc_version', '1'),
+								'vpc_MerchTxnRef' => $form_state['values']['vpc_MerchTxnRef'],
+               );
+  $form_state['redirect'] = _uc_hsbc_migs_migs_do_url_old($args);
+}
+
+/**
+ * Callback for MIGS order completion.
+ */
+function uc_hsbc_migs_complete($cart_id = 0) {
+  // ensure that MIGS is configured before processing
+  $secure_secret   = variable_get('uc_hsbc_migs_secure_secret', '');
+  if ( empty($secure_secret) ) {
+    // Secure Hash was not validated, none there to validate
+    drupal_set_title(UC_HSBC_MIGS_ERROR_NOT_PROCESSED);
+    watchdog( 'uc_hsbc_migs', 'Unable to process response from MIGS gateway, as MIGS Secure Hash Secret is not configured. Please correct your !settings.', array('!settings' => l('payment method settings', 'admin/store/settings/payment/edit/methods')), WATCHDOG_WARNING);
+    return theme('uc_hsbc_migs_order_incomplete',
+								 array('response_message' => UC_HSBC_MIGS_ERROR_GENERAL_ERROR,
+											 'response_receiptno' => $receiptNo,
+											 'order_info' => $orderInfo,
+											 'order' => $order)
+								 );
+  }
+
+  $result = _uc_hsbc_migs_validate_transaction($secure_secret);
+  $order = uc_order_load(check_plain($_GET['vpc_OrderInfo']));
+  $orderInfo = check_plain($_GET['vpc_OrderInfo']);
+  if (isset($_GET['vpc_ReceiptNo'])) {
+    $receiptNo = check_plain($_GET['vpc_ReceiptNo']);
+  }
+  else {
+    $receiptNo = '';
+  }
+  $txnResponseCode = check_plain($_GET['vpc_TxnResponseCode']);
+  $amount = check_plain($_GET['vpc_Amount']);
+	$plain_message   = check_plain((isset($_GET['vpc_Message'])) ? $_GET['vpc_Message'] : NULL);
+
+  switch ($result) {
+    case UC_HSBC_MIGS_BADHASH:
+      // Secure Hash validation failed
+      drupal_set_title(UC_HSBC_MIGS_ERROR_NOT_PROCESSED);
+      watchdog( 'uc_hsbc_migs', 'MIGS gateway rejected payment due to validation failure. $_GET was: <pre>@get</pre>', array('@get' => print_r($_GET,1)), WATCHDOG_WARNING );
+      return theme('uc_hsbc_migs_order_incomplete', array('response_message' => UC_HSBC_MIGS_ERROR_VALIDATION, 'response_receiptno' => $receiptNo, 'order_info' => $orderInfo, 'order' => $order));
+
+    case UC_HSBC_MIGS_NOHASH:
+      drupal_set_title(UC_HSBC_MIGS_ERROR_NOT_PROCESSED);
+      watchdog( 'uc_hsbc_migs', 'MIGS gateway rejected payment, and returned data did not contain a secure hash . $_GET was: <pre>@get</pre>', array('@get' => print_r($_GET,1)), WATCHDOG_WARNING );
+      return theme('uc_hsbc_migs_order_incomplete', array('response_message' => UC_HSBC_MIGS_ERROR_VALIDATION, 'response_receiptno' => $receiptNo, 'order_info' => $orderInfo, 'order' => $order));
+
+    case UC_HSBC_MIGS_NOORDER:
+      drupal_set_title(UC_HSBC_MIGS_ERROR_NOT_PROCESSED);
+      watchdog('uc_hsbc_migs', 'MIGS gateway unable to find order to process. The Order ID returned from MIGS was @order_id, and $_GET was <pre>@get</pre>', array('@order_id' => $orderInfo, '@get' => print_r($_GET,1)), WATCHDOG_WARNING);
+      return theme('uc_hsbc_migs_order_incomplete', array('response_message' => UC_HSBC_MIGS_ERROR_GENERAL_ERROR, 'response_receiptno' => $receiptNo, 'order_info' => $orderInfo, 'order' => $order));
+
+    case UC_HSBC_MIGS_ORDERPOSTCHECKOUT:
+      drupal_set_title('Order Already Completed');
+      // this happens when people reload the completion page. It's OK,
+      // but we'll make a note of it anyway.
+      watchdog('uc_hsbc_migs', 'MIGS payment notification received for already checked out order @order_id.', array('@order_id'=>$orderInfo));
+      return theme('uc_hsbc_migs_order_incomplete', array('response_message' => UC_HSBC_MIGS_ERROR_GENERAL_ERROR, 'response_receiptno' => $receiptNo, 'order_info' => $orderInfo, 'order' => $order));
+
+    case UC_HSBC_MIGS_NOTYINCHECKOUT:
+      drupal_set_title('Order Error');
+      watchdog('uc_hsbc_migs', 'MIGS payment notification received for order @order_id which is not yet in checkout status.', array('@order_id'=>$orderInfo));
+      return theme('uc_hsbc_migs_order_incomplete', array('response_message' => 'Order not in checkout', 'response_receiptno' => $receiptNo, 'order_info' => $orderInfo, 'order' =>$order));
+
+    case UC_HSBC_MIGS_PAYMENT_ERROR:
+      // validation success, payment fail
+      drupal_set_title(t('Order Error'));
+      $errmsg = _uc_hsbc_migs_get_response_description($txnResponseCode);
+			uc_hsbc_migs_status_save($order->order_id, $txnResponseCode);
+      watchdog( 'uc_hsbc_migs', 'A payment via MIGS failed. The error message was: <strong>%errmsg</strong>.<hr />$_GET was: <pre>@get</pre><hr />$order was: <pre>@order</pre>', array('@get' => print_r($_GET,1), '@order' => print_r($order,1), '%errmsg' => $errmsg), WATCHDOG_WARNING );
+      uc_order_comment_save($order->order_id, 0, t('Error processing payment for this order.'), 'admin');
+			$error_display = uc_hsbc_migs_error_display($txnResponseCode);
+			$_SESSION['cart_order'] = NULL;
+      return theme('uc_hsbc_migs_order_incomplete', array('response_message' => $error_display, 'response_receiptno' => $receiptNo, 'order_info' => $orderInfo, 'order' => $order));
+
+    case UC_HSBC_MIGS_SUCCESS:
+      // success
+			$order_info = $_GET['vpc_OrderInfo'];
+			$receipt_no = $_GET['vpc_ReceiptNo'];
+			$transaction_no = $_GET['vpc_TransactionNo'];
+			$authorized_no = $_GET['vpc_AuthorizeId'];
+
+      $targs = array(
+        '@order'   => $order_info,
+        '@receipt' => $receipt_no,
+        '@trans'   => $transaction_no,
+        '@amount'  => uc_currency_format($amount/100),
+      ) ;
+      $comment = t('A payment of @amount for order #@order was made via MIGS by credit card with receipt number: @receipt and transaction number: @trans', $targs);
+      // we also attach the MIGS receipt number to the order so we can
+      // use it in an order token. Some MIGS banks require this number
+      // be displayed to the purchaser in order to more readily process
+      // complaints.
+      $order->data['migs_receiptno'] =  $_GET['vpc_ReceiptNo'] ;
+      uc_order_save($order);
+			uc_hsbc_migs_status_save($order->order_id, $txnResponseCode, $transaction_no, $receipt_no, $authorized_no);
+
+      // uc_order_save() saves order_status so it needs to happen before uc_payment_enter()
+      uc_payment_enter($order->order_id, 'migs', $amount/100, 0, array(), $comment);
+
+      // Empty the cart...
+      uc_cart_empty($cart_id);
+
+      $do_login = variable_get('uc_new_customer_login', FALSE );
+      $output = uc_cart_complete_sale($order, $do_login);
+      $output = str_replace('[site-url]', url(), $output);
+
+      // Add a comment to let sales team know this came in through the site.
+      uc_order_comment_save($order->order_id, 0, t('A payment has been accepted.'), 'admin');
+      return $output;
+	  default:
+      drupal_set_title(UC_HSBC_MIGS_ERROR_NOT_PROCESSED);
+      watchdog('uc_hsbc_migs', 
+							 'MIGS gateway rejected payment due to validation failure. $_GET was: <pre>@get</pre>',
+							   array('@get' => print_r($_GET, true)),
+							 WATCHDOG_WARNING );
+      return theme('uc_hsbc_migs_order_incomplete',
+									 array('response_message' => $plain_message,
+												 'error_message' => $result,
+												 'response_receiptno' => $receiptNo,
+												 'order_info' => $orderInfo,
+												 'order' => $order,
+												 )
+									 );
+  }
+}
+
+/**
+ * Implementation of hook_token_values(). (token.module)
+ */
+function uc_hsbc_migs_token_values($type, $object = NULL) {
+  switch ($type) {
+    case 'order':
+      $order = $object;
+      if ( isset($order->data['migs_receiptno']) ) {
+        $values['order-migs-receiptno'] = $order->data['migs_receiptno'] ;
+      }
+      break;
+  }
+  return $values;
+}
+
+/**
+ * Implementation of hook_token_list(). (token.module)
+ */
+function uc_hsbc_migs_token_list($type = 'all') {
+  if ($type == 'order' || $type == 'ubercart' || $type == 'all') {
+    $tokens['order']['order-migs-receiptno'] = t('MIGS Receipt Number (if payment processed via uc_hsbc_migs)');
+  }
+  return $tokens;
+}
+
+/**
+ * Preprocess function for uc_hsbc_migs_order_incomplete()
+ */
+function template_preprocess_uc_hsbc_migs_order_incomplete(&$variables) {
+  if ( empty($variables['order_info']) ) {
+    $variables['order_id'] = 'Unknown Order ID' ;
+  }
+  else {
+    $variables['order_id'] = t('Order #@order_info', array('@order_info' => $variables['order_info']));
+  }
+  if ( empty($variables['response_receiptno']) ) {
+    $variables['receipt_no'] = 'Unknown Receipt No' ;
+  }
+  else {
+    $variables['receipt_no'] = t('Receipt #@receipt_no', array('@receipt_no' => $variables['response_receiptno']));
+  }
+  // by doing this, we make it possible for sites to reveal more
+  // detailed error messages via themeing, and still conceal them
+  // by default which keeps MIGS happy (by default)
+  switch ( $variables['response_message'] ) {
+    // these variables indicate a site config issue or other
+    // issue we don't want to share with the great unwashed
+    case UC_HSBC_MIGS_ERROR_GENERAL_ERROR :
+    case UC_HSBC_MIGS_ERROR_VALIDATION :
+    case UC_HSBC_MIGS_ERROR_NOT_PROCESSED :
+    case UC_HSBC_MIGS_ERROR_NOT_FOUND :
+      $variables['error_message'] = 'Transaction error.' ;
+      break ;
+
+    // however, if the problem is with the buyer's CC, we want to tell them what's wrong
+    default :
+      $variables['error_message'] = $variables['response_message'] ;
+  }
+}
+
+/**
+ * Implementation of hook_ucga_display from UC Google Analytics module
+ */
+function uc_hsbc_migs_ucga_display() {
+  if (arg(0) == 'cart' && arg(1) == 'hsbc-migs' && arg(2) == 'complete') {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Generate a MIGS Digital Order URL
+ *
+ * @param array $args with details of transaction
+ * @return string URL for redirect
+ */
+function _uc_hsbc_migs_migs_do_url_old($args) {
+	$secure_secret = variable_get('uc_hsbc_migs_secure_secret', '');
+  $md5HashData = $secure_secret . 
+	               $args['vpc_AccessCode'] . 
+								 $args['vpc_Amount'] . 
+								 $args['vpc_Command'] . 
+								 $args['vpc_Locale'] . 
+								 $args['vpc_MerchTxnRef'] . 
+								 $args['vpc_Merchant'] . 
+								 $args['vpc_OrderInfo'] . 
+								 $args['vpc_ReturnURL'] . 
+								 $args['vpc_Version'];
+
+  $url = variable_get('uc_hsbc_migs_vpc_url', UC_HSBC_MIGS_VPC_URL) . '?' .
+    'vpc_AccessCode='   . urlencode($args['vpc_AccessCode']) .
+    '&vpc_Amount='      . urlencode($args['vpc_Amount']) .
+    '&vpc_Command='     . urlencode($args['vpc_Command']) .
+    '&vpc_Locale='      . urlencode($args['vpc_Locale']) .
+    '&vpc_MerchTxnRef=' . urlencode($args['vpc_MerchTxnRef']) .
+    '&vpc_Merchant='    . urlencode($args['vpc_Merchant']) .
+    '&vpc_OrderInfo='   . urlencode($args['vpc_OrderInfo']) .
+    '&vpc_ReturnURL='   . urlencode($args['vpc_ReturnURL']) .
+    '&vpc_Version='     . urlencode($args['vpc_Version']) .
+    '&vpc_SecureHash='  . strtoupper(md5($md5HashData));
+  return $url;
+}
+
+function _uc_hsbc_migs_migs_do_url($args) {
+	$params = array();
+	$hashdata = array();
+	$hashdata[] = variable_get('uc_hsbc_migs_secure_secret', '');
+	$vpcUrl = variable_get('uc_hsbc_migs_vpc_url', UC_HSBC_MIGS_VPC_URL);
+
+	foreach ($args as $index => $arg){
+	  $params[] = $index . '=' . urlencode($arg);
+		$hashdata[] = $arg;
+	}
+
+  $md5HashData = implode('', $hashdata);
+	$params[] = 'vpc_SecureHash='  . strtoupper(md5($md5HashData));
+	$urlData = implode('&', $params);
+  $url = $vpcUrl . '?' . $urlData;
+
+/*
+		watchdog('uc_hsbc_migs',
+					   'Sent data !url. <br />!arg <br /> !hashdata', array('!url' => print_r($url, true), 
+																																  '!arg'=> print_r($args, true),
+																																	'!hashdata'=>$md5HashData ), 
+						 WATCHDOG_WARNING);
+//*/
+  return $url;
+}
+
+/**
+ * Process a MIGS Digital Receipt request
+ *
+ * @param string $secure_secret
+ * @return integer MIGS response code
+ */
+function _uc_hsbc_migs_validate_transaction($secure_secret) {
+  // Standard Receipt Data
+  $amount          = (isset($_GET['vpc_Amount'])) ? $_GET['vpc_Amount'] : NULL;
+  $locale          = (isset($_GET['vpc_Locale'])) ? $_GET['vpc_Locale'] : NULL;
+  $batchNo         = (isset($_GET['vpc_BatchNo'])) ? $_GET['vpc_BatchNo'] : NULL;
+  $command         = (isset($_GET['vpc_Command'])) ? $_GET['vpc_Command'] : NULL;
+  $message         = (isset($_GET['vpc_Message'])) ? $_GET['vpc_Message'] : NULL;
+  $version         = (isset($_GET['vpc_Version'])) ? $_GET['vpc_Version'] : NULL;
+  $cardType        = (isset($_GET['vpc_Card'])) ? $_GET['vpc_Card'] : NULL;
+  $orderInfo       = (isset($_GET['vpc_OrderInfo'])) ? $_GET['vpc_OrderInfo'] : NULL;
+  $receiptNo       = (isset($_GET['vpc_ReceiptNo'])) ? $_GET['vpc_ReceiptNo'] : NULL;
+  $merchantID      = (isset($_GET['vpc_Merchant'])) ? $_GET['vpc_Merchant'] : NULL;
+  $authorizeID     = (isset($_GET['vpc_AuthorizeId'])) ? $_GET['vpc_AuthorizeId'] : NULL;
+  $merchTxnRef     = (isset($_GET['vpc_MerchTxnRef'])) ? $_GET['vpc_MerchTxnRef'] : NULL;
+  $transactionNo   = (isset($_GET['vpc_TransactionNo'])) ? $_GET['vpc_TransactionNo'] : NULL;
+  $acqResponseCode = (isset($_GET['vpc_AcqResponseCode'])) ? $_GET['vpc_AcqResponseCode'] : NULL;
+  $txnResponseCode = check_plain((isset($_GET['vpc_TxnResponseCode'])) ? $_GET['vpc_TxnResponseCode'] : NULL);
+  $plain_message   = check_plain((isset($_GET['vpc_Message'])) ? $_GET['vpc_Message'] : NULL);
+
+  // 3-D Secure Data
+  $verType         = array_key_exists('vpc_VerType', $_GET)          ? $_GET['vpc_VerType']          : "No Value Returned";
+  $verStatus       = array_key_exists('vpc_VerStatus', $_GET)        ? $_GET['vpc_VerStatus']        : "No Value Returned";
+  $token           = array_key_exists('vpc_VerToken', $_GET)         ? $_GET['vpc_VerToken']         : "No Value Returned";
+  $verSecurLevel   = array_key_exists('vpc_VerSecurityLevel', $_GET) ? $_GET['vpc_VerSecurityLevel'] : "No Value Returned";
+  $enrolled        = array_key_exists('vpc_3DSenrolled', $_GET)      ? $_GET['vpc_3DSenrolled']      : "No Value Returned";
+  $xid             = array_key_exists('vpc_3DSXID', $_GET)           ? $_GET['vpc_3DSXID']           : "No Value Returned";
+  $acqECI          = array_key_exists('vpc_3DSECI', $_GET)           ? $_GET['vpc_3DSECI']           : "No Value Returned";
+  $authStatus      = array_key_exists('vpc_3DSstatus', $_GET)        ? $_GET['vpc_3DSstatus']        : "No Value Returned";
+
+  $vpc_Txn_Secure_Hash = isset($_GET['vpc_SecureHash']) ? $_GET['vpc_SecureHash'] : '';
+  $errorExists = FALSE ;
+
+  if ( $txnResponseCode != 7 && $txnResponseCode != '' ) {
+    $md5HashData = $secure_secret;
+    // sort all the incoming vpc response fields and leave out any
+    // with no value, or which are "vpc_SecureHash" or "q"
+    foreach($_GET as $key => $value) {
+      if ($key != "vpc_SecureHash" && $key != "q" && strlen($value) > 0) { // strlen()>0 not empty() because of '0'
+        $md5HashData .= $value;
+      }
+    }
+    // validate secure hash
+    if (strtoupper($vpc_Txn_Secure_Hash) != strtoupper(md5($md5HashData))) {
+      return UC_HSBC_MIGS_BADHASH;
+    }
+    else {
+      // validation success; fall thru to next phase
+    }
+  }
+	else {
+    return $txnResponseCode;
+  }
+
+  $order = uc_order_load($orderInfo);
+  if ($order === FALSE) {
+    return UC_HSBC_MIGS_NOORDER;
+  }
+
+  switch (uc_order_status_data($order->order_status, 'state')) {
+    case 'in_checkout' :
+      watchdog('uc_hsbc_migs', 'MIGS payment notification received for order @order_id.', array('@order_id'=>$orderInfo));
+      break ;
+    case 'post_checkout' :
+      return UC_HSBC_MIGS_ORDERPOSTCHECKOUT;
+    default:
+      return UC_HSBC_MIGS_NOTYINCHECKOUT;
+  }
+
+  if ( $txnResponseCode != "0") {
+    return UC_HSBC_MIGS_PAYMENT_ERROR;
+  }
+	else {
+    return UC_HSBC_MIGS_SUCCESS;
+  }
+}
+
+/**
+ * This method uses the QSI Response code retrieved from the Digital
+ * Receipt and returns an appropriate description for the QSI Response Code
+ *
+ * @param $responseCode String containing the QSI Response Code
+ *
+ * @return String containing the appropriate description
+ */
+function _uc_hsbc_migs_get_response_description($responseCode) {
+  switch ($responseCode) {
+    case '0' :
+      $result = "Transaction Successful";
+      break;
+    case '?' :
+      $result = "Transaction status is unknown";
+      break;
+    case '1' :
+      $result = "Transaction could not be processed";
+      break;
+    case '2' :
+      $result = "Bank Declined Transaction";
+      break ;
+    case '3' :
+      $result = "No Reply from Bank";
+      break ;
+    case '4' :
+      $result = "Expired Card";
+      break ;
+    case '5' :
+      $result = "Insufficient funds";
+      break ;
+    case '6' :
+      $result = "Error Communicating with Bank";
+      break ;
+    case '7' :
+      $result = "Payment Server System Error";
+      break ;
+    case '8' :
+      $result = "Transaction Type Not Supported";
+      break ;
+    case '9' :
+      $result = "Bank declined transaction (Do not contact Bank)";
+      break ;
+    case 'A' :
+      $result = "Transaction Aborted";
+      break ;
+    case 'C' :
+      $result = "Transaction Cancelled";
+      break ;
+    case 'D' :
+      $result = "Deferred transaction has been received and is awaiting processing";
+      break ;
+    case 'F' :
+      $result = "3D Secure Authentication failed";
+      break ;
+    case 'I' :
+      $result = "Card Security Code verification failed";
+      break ;
+    case 'L' :
+      $result = "Shopping Transaction Locked (Please try the transaction again later)";
+      break ;
+    case 'N' :
+      $result = "Cardholder is not enrolled in Authentication scheme";
+      break ;
+    case 'P' :
+      $result = "Transaction has been received by the Payment Adaptor and is being processed";
+      break ;
+    case 'R' :
+      $result = "Transaction was not processed - Reached limit of retry attempts allowed";
+      break ;
+    case 'S' :
+      $result = "Duplicate SessionID (OrderInfo)";
+      break ;
+    case 'T' :
+      $result = "Address Verification Failed";
+      break ;
+    case 'U' :
+      $result = "Card Security Code Failed";
+      break ;
+    case 'V' :
+      $result = "Address Verification and Card Security Code Failed";
+      break ;
+    default  :
+      $result = "Unable to be determined";
+  }
+  return $result;
+}
+
+/**
+ * This method uses the QSI Response code retrieved from the Digital
+ * Receipt and returns an appropriate description for the QSI Response Code
+ *
+ * @param $statusResponse String containing the QSI Response Code
+ *
+ * @return string containing the appropriate description
+ */
+function _uc_hsbc_migs_get_status_description($statusResponse) {
+  if ($statusResponse == '' || $statusResponse == 'No Value Returned') {
+    $result = "3DS not supported or there was no 3DS data provided";
+  } else {
+    switch ($statusResponse) {
+      case 'Y' :
+        $result = "The cardholder was successfully authenticated.";
+        break;
+      case 'E' :
+        $result = "The cardholder is not enrolled.";
+        break;
+      case 'N' :
+        $result = "The cardholder was not verified.";
+        break;
+      case 'U' :
+        $result = "The cardholder's Issuer was unable to authenticate due to some system error at the Issuer.";
+        break;
+      case 'F' :
+        $result = "There was an error in the format of the request from the merchant.";
+        break;
+      case 'A' :
+        $result = "Authentication of your Merchant ID and Password to the ACS Directory Failed.";
+        break;
+      case 'D' :
+        $result = "Error communicating with the Directory Server.";
+        break;
+      case 'C' :
+        $result = "The card type is not supported for authentication.";
+        break;
+      case 'S' :
+        $result = "The signature on the response received from the Issuer could not be validated.";
+        break;
+      case 'P' :
+        $result = "Error parsing input from Issuer.";
+        break;
+      case 'I' :
+        $result = "Internal Payment Server system error.";
+        break;
+      default  :
+        $result = "Unable to be determined";
+        break;
+    }
+  }
+  return $result;
+}
+
+function _uc_hsbc_migs_select_transaction_results(&$element) {
+  $prefix = substr($element['#value'], 0, strlen($element['#value'])-2);
+  $element['#title'] = 'MIGS Transaction Debug';
+  $element['#description'] = t('Disable transaction debugging at !link » !title » !select_return_codes', array('!link' => l('Payment method settings', 'admin/store/settings/payment/edit/methods'), '!title' => t('HSBC MIGS Payment settings'), '!select_return_codes' => t(UC_HSBC_MIGS_SELECT_RETURN_CODES)));
+  $element['#type'] = 'select';
+  unset($element['#value']);
+  $element['#default_value'] = $prefix.'00';
+  $element['#options'] = array(
+    $prefix.'00' => 'Successful Transaction',
+    $prefix.'05' => 'Unknown Error',
+    $prefix.'51' => 'Insufficient Fund',
+    $prefix.'68' => 'No reply',
+    $prefix.'10' => 'Could not be processed',
+    $prefix.'33' => 'Expired',
+  );
+}
+
+/**
+ * Helper function to return a structured array of supported card
+ * types MIGS offers.
+ */
+function _uc_hsbc_migs_card_types() {
+  $card_types = array(
+    'mastercard' => 'MasterCard',
+    'visa' => 'VISA',
+    'amex' => 'American Express',
+    'jcb' => 'JCB',
+    'diners' => 'Diners Club',
+  );
+  return $card_types;
+}
+
+/**
+ * Allow override of logo display.
+ *
+ */
+function theme_uc_hsbc_migs_cc_logo($vars) {
+	$theme_logo_path = path_to_theme() . "/uc_hsbc_migs/{$vars['id']}.gif";
+	$default_logo = drupal_get_path('module','uc_hsbc_migs') . "/images/{$vars['id']}.gif";
+  $vars['path'] = (file_exists($theme_logo_path)) ? $theme_logo_path : $default_logo;
+  return theme('image', array('path' => $vars['path'], 'alt' => $vars['alt'])) ;
+}
+
+/**
+ * Allow override of payment method title.
+ */
+function theme_uc_hsbc_migs_method_title($vars) {
+  $cards = _uc_hsbc_migs_card_types();
+  $vars['title'] = '<strong>' . $vars['title'] . '</strong>';
+	foreach (variable_get('uc_hsbc_migs_method_title_display_icons', array()) as $card) {
+	 $logos[] = theme('uc_hsbc_migs_cc_logo', array('id' => $card, 'alt' => $cards[$card]));
+	}
+	if (!empty($logos)) {
+		$vars['title'] .= '<br>' . theme('uc_hsbc_migs_cc_logos', array('logos' => $logos));
+	}
+  return $vars['title'];
+}
+
+function theme_uc_hsbc_migs_cc_logos($vars) {
+  drupal_add_css(drupal_get_path('module', 'uc_hsbc_migs') . '/css/uc_hsbc_migs.css');
+  return implode(' ', $vars['logos']);
+  // return theme('item_list', $vars['logos'], NULL, 'ul', array('class' => 'uc-migs-cc-logos'));
+}
+
+function uc_hsbc_migs_status_save($order_id, $status, $transno = '', $receiptno = '', $authorized_no = ''){
+  db_delete('uc_hsbc_migs')
+    ->condition('order_id', $order_id)
+    ->execute();
+
+	$record = array(
+	  'hsbc_migs_sid' => $status,
+    'order_id' => $order_id,
+    'trans_no' => $transno,
+    'receipt_no' => $receiptno,
+		'authorized_no' => $authorized_no,
+  );
+
+  drupal_write_record('uc_hsbc_migs', $record);
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function uc_hsbc_migs_views_api() {
+  return array(
+    'api' => 3,
+  );
+}
+
+function uc_hsbc_migs_error_display($code) {
+	switch ($code){
+		case 3:
+		case 6:
+		case 7:
+		 return 'Transaction unsuccessful, please try again ......';
+		 break;
+		case 1:
+		case 5:
+		  return 'Transaction rejected, please contact your bank for detailed information.';
+			break;
+	  default:
+		  return UC_HSBC_MIGS_ERROR_GENERAL_ERROR;
+		
+	}
+}

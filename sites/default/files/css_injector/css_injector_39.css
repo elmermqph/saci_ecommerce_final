@@ -1,0 +1,82 @@
+h1.title{
+margin-top:15px;
+}
+.page-node-edit.node-type-product h1.title,
+.page-node-edit.node-type-product .form-item-ordering, 
+.page-admin-structure-taxonomy-all-appliances .tabledrag-toggle-weight-wrapper{
+display:none;
+}
+
+#product-node-form .field-name-field-hot-offers, 
+#product-node-form .field-name-field-on-sale-items, 
+#product-node-form .form-item-title, 
+#product-node-form .form-item-field-brands-und, 
+#product-node-form #edit-prices .form-item-sell-price, 
+#product-node-form .form-item-model, 
+#taxonomy-form-term .form-item-name, 
+#taxonomy-form-term .field-name-field-category-menu, 
+#taxonomy-form-term .field-name-field-switch-compare
+{
+position:relative;
+}
+
+#product-node-form .field-name-field-hot-offers .form-required, 
+#product-node-form .field-name-field-on-sale-items .form-required, 
+#product-node-form .form-item-title .form-required, 
+#product-node-form .form-item-field-brands-und .form-required, 
+#product-node-form #edit-prices .form-item-sell-price .form-required, 
+#product-node-form .form-item-model .form-required, 
+#taxonomy-form-term .form-item-name .form-required, 
+#taxonomy-form-term .field-name-field-category-menu .form-required, 
+#taxonomy-form-term .field-name-field-switch-compare .form-required {
+left: 69px;
+top:0;
+}
+#taxonomy-form-term .form-item-name .form-required{
+left: 95px;
+}
+#taxonomy-form-term .field-name-field-category-menu .form-required{
+left: 100px;
+}
+#taxonomy-form-term .field-name-field-switch-compare .form-required{
+ left: 161px;
+}
+#taxonomy-form-term .form-item-name .form-required{
+left: 100px;
+}
+#product-node-form .form-item-model .form-required{
+left: 30px;
+}
+#product-node-form .field-name-field-on-sale-items .form-required{
+left: 52px;
+}
+#product-node-form .form-item-field-brands-und .form-required{
+left:45px;
+}
+#product-node-form .form-item-title .form-required{
+left: 89px;
+}
+#product-node-form #edit-prices .form-item-sell-price .form-required{
+ left: 65px;
+    top: 7px;
+}
+#pid-admin-structure-taxonomy-all-appliances-add 
+#product-node-form #edit-weight, 
+#product-node-form #edit-dimensions, 
+#product-node-form #edit-weight 
+ {
+display:block !important;
+}
+#product-node-form #edit-prices .form-item-list-price, 
+#product-node-form #edit-prices .form-item-cost{
+display:none !important;
+}
+#pid-admin-structure-taxonomy-all-appliances-list h1.title{
+display:none;
+}
+
+.page-node-edit.node-type-product input.disabled{
+background-color: #C0C0C0;
+color: grey;
+border: 1px solid #CCCCCC;
+}

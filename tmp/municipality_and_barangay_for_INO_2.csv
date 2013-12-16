@@ -1,0 +1,48 @@
+municipality_name,municipality_id,barangay_name,barangay_id,status
+Vintar,1835,Salsalamagui (West),10388,0
+Vintar,1835,Salsalamagui (East),10389,0
+Vintar,1835,Isic Isic,10390,0
+Vintar,1835,Diaton,10391,0
+Vintar,1835,Dagupan,10392,0
+Vintar,1835,Alsem,10393,0
+Vintar,1835,Abkir,10394,0
+Vintar,1835,Vintar,10395,0
+Solsona,1836,Solsona,10396,0
+Sarrat,1837,Sarrat,10397,0
+San Nicolas,1838,San Nicolas,10398,0
+Pinili,1839,Bungro,10399,0
+Pinili,1839,Pinili,10400,0
+Piddig,1840,Santa Maria,10401,2
+Piddig,1840,Piddig,10402,2
+Piddig,1840,Boyboy,10501,1
+Pasuquin,1841,Santa Matilde,10403,0
+Pasuquin,1841,Santa Catalina,10404,0
+Pasuquin,1841,San Juan,10405,0
+Pasuquin,1841,Pasuquin,10406,0
+Paoay,1842,Paoay,10407,0
+Pagudpud,1843,Pagudpud,10408,0
+Nueva Era,1844,Uguis,10409,0
+Nueva Era,1844,Cabittauran,10410,0
+Nueva Era,1844,Nueva Era,10411,0
+Marcos,1845,Marcos,10412,0
+Laoag City,1846,Laoag City,10413,0
+Espiritu (Bana),1847,Binacag,10414,0
+Espiritu (Bana),1847,Espiritu (Bana),10415,0
+Dumalneg,1848,Dumalneg,10416,0
+Dingras,1849,Espiritu,10417,0
+Dingras,1849,San Esteban,10418,0
+Dingras,1849,Barong,10419,0
+Dingras,1849,Dingras,10420,0
+Currimao,1850,Currimao,10421,0
+Carazi,1851,Carazi,10422,0
+Burgos,1852,Burgos,10423,0
+Batac,1853,Batac,10424,0
+Bangui,1854,Bangui,10425,0
+Badoc,1855,Pagsanahan Sur,10426,0
+Badoc,1855,Pagsanahan Norte,10427,0
+Badoc,1855,Nagrebcan,10428,0
+Badoc,1855,Badoc,10429,0
+Bacarra,1856,Casilian,10430,0
+Bacarra,1856,Bacarra,10431,0
+Adams,1857,Adams,10432,0
+Piddig,1840,Cabaroan,0,3

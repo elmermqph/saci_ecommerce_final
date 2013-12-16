@@ -1,0 +1,282 @@
+<?php
+/**
+ * @file
+ * SimpleTest testing suites.
+ */
+
+/**
+ * Framework tests.
+ */
+class RulesConditionalFrameworkTestCase extends DrupalWebTestCase {
+  /**
+   * Returns test info.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Framework',
+      'description' => 'Test the core conditional plugin framework.',
+      'group' => 'Conditional Rules',
+    );
+  }
+
+  /**
+   * Sets up test case.
+   */
+  protected function setUp() {
+    parent::setUp('rules_conditional_test');
+  }
+
+  /**
+   * Tests plugin label.
+   */
+  public function testPluginLabel() {
+    $conditional = new RulesConditionalTestStubPlugin();
+    $label = $conditional->label();
+    $this->assertEqual('Stub conditional', $label, 'Default conditional element label uses the plugin label.');
+
+    $branch = new RulesConditionalTestStubBranchPlugin();
+    $label = $branch->label();
+    $this->assertEqual('Stub conditional branch', $label, 'Default conditional branch element label uses the plugin label.');
+  }
+
+  /**
+   * Tests intercepting a method.
+   */
+  public function testInterceptMethod() {
+    $message = 'Test magic method is intercepted.';
+    try {
+      $conditional = new RulesConditionalTestStubPlugin();
+      $conditional->test();
+      $this->assert(FALSE, $message);
+    }
+    catch (Exception $ex) {
+      $this->assertEqual('intercept', $ex->getMessage(), $message);
+    }
+  }
+
+  /**
+   * Tests fluent interface.
+   */
+  public function testFluentInterface() {
+    $conditional = new RulesConditionalTestStubPlugin();
+    $container1 = new RulesActionSet();
+    $conditional->fluent($container1)->action('drupal_message', array('message' => '[site:name]'));
+    $this->assertEqual(1, count($container1->elements()), 'Fluent interface adds action to the active element.');
+    $container2 = new RulesActionSet();
+    $conditional->fluent($container2)->action('drupal_message', array('message' => '[site:name]'));
+    $this->assertEqual(1, count($container1->elements()), 'Fluent interface does not add action to a previously active element.');
+  }
+
+  /**
+   * Tests branch add/remove methods.
+   */
+  public function testParentBranchOperation() {
+    // Set up stub objects.
+    $conditional = new RulesConditionalTestStubPlugin();
+    $branch = new RulesConditionalTestStubBranchPlugin();
+
+    // Add branch to conditional.
+    $conditional->addBranch($branch);
+    $iterator = $conditional->getIterator();
+    $this->assertEqual(1, count($iterator), 'Branch can be added to conditional.');
+    $this->assertIdentical($branch, $iterator->current(), 'Added branch is a child element of conditional.');
+
+    // Remove branch from conditional.
+    $conditional->removeBranch($branch);
+    $this->assertEqual(0, count($conditional->getIterator()), 'Branch can be removed from conditional.');
+  }
+
+  /**
+   * Tests setting a conditional as the parent of a branch.
+   */
+  public function testBranchSetParent() {
+    // Set up stub objects.
+    $conditional = new RulesConditionalTestStubPlugin();
+    $branch = new RulesConditionalTestStubBranchPlugin();
+
+    // Set conditional as parent of branch.
+    $branch->setParent($conditional);
+    $this->assertIdentical($conditional, $branch->parentElement(), 'Conditional can be set as parent of branch.');
+    $iterator = $conditional->getIterator();
+    $this->assertTrue(count($iterator) == 1 && $iterator->current() === $branch, 'Branch is added as a child element to the parent conditional.');
+
+    // Set another conditional as parent of branch.
+    $conditional2 = new RulesConditionalTestStubPlugin();
+    $branch->setParent($conditional2);
+    $this->assertIdentical($conditional2, $branch->parentElement(), 'Branch parent can be changed.');
+    $this->assertEqual(0, count($conditional->getIterator()), 'Branch is removed from old parent.');
+
+    // Set an incompatible parent.
+    $message = 'Branch prevents incompatible parent from being set.';
+    try {
+      $incompatibleContainer = new RulesActionSet();
+      $branch->setParent($incompatibleContainer);
+      $this->assert(FALSE, $message);
+    }
+    catch (RulesEvaluationException $ex) {
+      $this->assert(TRUE, $message);
+    }
+  }
+
+  /**
+   * Tests branch sibling methods.
+   */
+  public function testBranchSibling() {
+    // Set up stub objects.
+    $conditional = new RulesConditionalTestStubPlugin();
+    $branch1 = new RulesConditionalTestStubBranchPlugin();
+    $branch1->setParent($conditional);
+    $branch2 = new RulesConditionalTestStubBranchPlugin();
+    $branch2->setParent($conditional);
+    $orphanBranch = new RulesConditionalTestStubBranchPlugin();
+
+    // Test obtaining siblings.
+    $this->assertIdentical($branch2, $branch1->getNextSibling(), 'Next sibling branch can be obtained.');
+    $this->assertIdentical($branch1, $branch2->getPreviousSibling(), 'Previous sibling branch can be obtained.');
+    $this->assertNull($branch1->getPreviousSibling(), 'First branch has no previous sibling.');
+    $this->assertNull($branch2->getNextSibling(), 'Last branch has no next sibling.');
+
+    // Test obtaining siblings from an orphan element.
+    $this->assertNull($orphanBranch->getNextSibling(), 'Orphan branch has no next sibling.');
+    $this->assertNull($orphanBranch->getPreviousSibling(), 'Orphan branch has no previous sibling.');
+  }
+}
+
+/**
+ * Default if-else tests.
+ */
+class RulesConditionalTestCase extends DrupalWebTestCase {
+  /**
+   * Returns test info.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Default conditional',
+      'description' => 'Test the if-else plugins.',
+      'group' => 'Conditional Rules',
+    );
+  }
+
+  /**
+   * Tests integrity check.
+   */
+  public function testIntegrityCheck() {
+    // TODO
+  }
+
+  /**
+   * Tests evaluation.
+   */
+  public function testEvaluate() {
+    // TODO
+  }
+
+  /**
+   * Tests exporting.
+   */
+  public function testExport() {
+    // TODO
+  }
+
+  /**
+   * Tests exporting.
+   */
+  public function testImport() {
+    // TODO
+  }
+}
+
+/**
+ * Switch tests.
+ */
+class RulesConditionalSwitchTestCase extends DrupalWebTestCase {
+  /**
+   * Returns test info.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Switch',
+      'description' => 'Test the switch plugins.',
+      'group' => 'Conditional Rules',
+    );
+  }
+
+  /**
+   * Tests integrity check.
+   */
+  public function testIntegrityCheck() {
+    // TODO
+  }
+
+  /**
+   * Tests evaluation.
+   */
+  public function testEvaluate() {
+    // TODO
+  }
+
+  /**
+   * Tests exporting.
+   */
+  public function testExport() {
+    // TODO
+  }
+
+  /**
+   * Tests exporting.
+   */
+  public function testImport() {
+    // TODO
+  }
+}
+
+/**
+ * UI tests.
+ */
+class RulesConditionalUITestCase extends DrupalWebTestCase {
+  /**
+   * Returns test info.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'User interface',
+      'description' => 'Test the user interface implementations for conditional plugins.',
+      'group' => 'Conditional Rules',
+    );
+  }
+
+  /**
+   * Sets up test case.
+   */
+  protected function setUp() {
+    parent::setUp('rules_conditional_test', 'rules_admin');
+  }
+
+  /**
+   * Tests RulesConditionalPluginUI.
+   */
+  public function testBaseUI() {
+    // TODO
+  }
+
+  /**
+   * Tests RulesConditionalEmptyUI.
+   */
+  public function testEmptyUI() {
+    // TODO
+  }
+
+  /**
+   * Tests RulesConditionalPredicateUI.
+   */
+  public function testPredicateUI() {
+    // TODO
+  }
+
+  /**
+   * Tests RulesConditionalCaseUI.
+   */
+  public function testCaseUI() {
+    // TODO
+  }
+}

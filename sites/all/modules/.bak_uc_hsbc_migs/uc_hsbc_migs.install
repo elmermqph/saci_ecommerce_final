@@ -1,0 +1,187 @@
+<?php
+/**
+ * Implements hook_schema().
+ */
+function uc_hsbc_migs_schema() {
+  $schema = array();
+
+  $schema['uc_hsbc_migs'] = array(
+    'description' => 'HSBC Payment status information.',
+    'fields' => array(
+      'hsbc_migs_id' => array(
+        'description' => 'Primary key: the MIGS ID.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'hsbc_migs_sid' => array(
+        'description' => 'The current status MIGS Payment status ID of the order.',
+        'type' => 'varchar',
+        'length' => 5,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'order_id' => array(
+        'description' => 'The {uc_orders}.order_id of the order.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+			'trans_no' => array(
+				'type'=>'varchar',
+ 			  'length' => 20,
+			  'not null' => TRUE,
+			  'default' => '',
+				'description' => 'Stores transaction no.',
+			),
+			'receipt_no' => array(
+ 			  'length' => 20,
+			  'not null' => TRUE,
+			  'default' => '',
+				'description' => 'Stores transaction no.',
+			),
+			'authorized_no' => array(
+ 			  'length' => 20,
+			  'not null' => TRUE,
+			  'default' => '',
+				'description' => 'Stores authorized no.',
+			),
+		),
+    'indexes' => array(
+      'order_id' => array('order_id'),
+    ),
+    'primary key' => array('hsbc_migs_id'),
+    'foreign keys' => array(
+      'order_id' => array('uc_orders' => 'order_id'),
+			'hsbc_migs_sid' => array('uc_hsbc_migs_statuses' => 'hsbc_migs_sid'),
+    ),
+  );
+
+  $schema['uc_hsbc_migs_statuses'] = array(
+    'description' => 'Statuses the order during MIGS Payment.',
+    'fields' => array(
+      'hsbc_migs_sid' => array(
+        'description' => 'Primary key: the payment status ID.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'title' => array(
+        'description' => 'The status title.',
+        'type' => 'varchar',
+        'length' => 48,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('hsbc_migs_sid'),
+    'foreign keys' => array(
+			'hsbc_migs_sid' => array('uc_hsbc_migs' => 'hsbc_migs_sid'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_install().
+ */
+function uc_hsbc_migs_install() {
+  $t = get_t();
+
+  $query = db_insert('uc_hsbc_migs_statuses')
+    ->fields(array(
+      'hsbc_migs_sid',
+      'title',
+    ));
+
+  $values = array(
+    array(
+      'hsbc_migs_sid' => '0',
+      'title' => $t('Successful Transaction'),
+    ),
+    array(
+      'hsbc_migs_sid' => '5',
+      'title' => $t('Insufficient Fund Transaction'),
+    ),
+    array(
+      'hsbc_migs_sid' => '1',
+      'title' => $t('Transaction with Unknown Error returned'),
+    ),
+  );
+
+  foreach ($values as $record) {
+    $query->values($record);
+  }
+  $query->execute();
+}
+
+/**
+ * Implements hook_uninstall().
+ */
+function uc_hsbc_migs_uninstall() {
+  db_delete('variable')
+    ->condition('name', 'uc_hsbc_migs_%', 'LIKE')
+    ->execute();
+}
+
+/**
+ * Convert the data column in the object cache.
+ */
+function uc_hsbc_migs_update_7100() {
+  $transaction_no = array(
+		'type' => 'int',
+		'unsigned' => TRUE,
+		'not null' => TRUE,
+		'default' => 0,
+    'description' => 'Stores transaction no.',
+  );
+  $receiptno = array(
+		'type' => 'int',
+		'unsigned' => TRUE,
+		'not null' => TRUE,
+		'default' => 0,
+    'description' => 'Stores transaction no.',
+  );
+
+  db_add_field('uc_hsbc_migs', 'trans_no', $transaction_no);
+  db_add_field('uc_hsbc_migs', 'receipt_no', $receiptno);
+}
+/**
+ * Convert the data column in the object cache.
+ */
+function uc_hsbc_migs_update_7101() {
+  $authorized = array(
+		'type' => 'int',
+		'unsigned' => TRUE,
+		'not null' => TRUE,
+		'default' => 0,
+    'description' => 'Stores authorized no.',
+  );
+
+  db_add_field('uc_hsbc_migs', 'authorized_no', $authorized);
+}
+function uc_hsbc_migs_update_7102() {
+	$varchartype = array('type'=>'varchar',
+											 'length' => 5,
+											 'not null' => TRUE,
+											 'default' => '',
+											 );
+  db_change_field('uc_hsbc_migs', 'receipt_no', 'receipt_no',  $varchartype);
+  db_change_field('uc_hsbc_migs', 'authorized_no', 'authorized_no',  $varchartype);
+  db_change_field('uc_hsbc_migs', 'trans_no', 'trans_no',  $varchartype);
+}
+function uc_hsbc_migs_update_7103() {
+	$varchartype = array('type'=>'varchar',
+											 'length' => 20,
+											 'not null' => TRUE,
+											 'default' => '',
+											 );
+  db_change_field('uc_hsbc_migs', 'receipt_no', 'receipt_no',  $varchartype);
+  db_change_field('uc_hsbc_migs', 'authorized_no', 'authorized_no',  $varchartype);
+  db_change_field('uc_hsbc_migs', 'trans_no', 'trans_no',  $varchartype);
+}
+
+//AuthorizeId

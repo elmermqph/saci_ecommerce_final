@@ -1,0 +1,3 @@
+name = Add Edit Delete User
+description = This module allow site admin to Add, Edit and Delete User
+core = 7.x 

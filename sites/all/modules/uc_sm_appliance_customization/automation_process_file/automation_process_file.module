@@ -1,0 +1,671 @@
+<?php 
+if(!defined("MMS_FILE_PATH_ROOT"))
+	define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
+/*
+	EMAIL RECIEVER TO FROM OUTBOUND MMS T1 File
+*/
+if(!defined("EMAIL_MMS_OUTBOUND_TO"))
+	define("EMAIL_MMS_OUTBOUND_TO", variable_get('mms_outbound_email_to',"p.ferrer@spinweb.ph,ecd@mci.com.ph,jyc@mci.com.ph,elcyn.cubillan@gmail.com,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com"));	
+	
+/*
+	EMAIL RECIEVER TO FROM OUTBOUND Transmital PDF.
+*/
+if(!defined("EMAIL_SACITRANSMITAL_TO"))
+	define("EMAIL_SACITRANSMITAL_TO",variable_get('transmital_email_to',"p.ferrer@spinweb.ph,ecd@mci.com.ph,jyc@mci.com.ph,elcyn.cubillan@gmail.com,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com,salesaudit.saci.ho@sm-shoemart.com,salesaudit2.saci.ho@sm-shoemart.com,marjorie.r.quirimit@sm-shoemart.com"));	
+
+
+function automation_process_file_menu(){
+	$items['saci_delivery_pdf'] = array(
+		'title'=>'Saci Transmital',
+		'page callback' => 'query_pdf_generate_page',
+		'access callback' => true,
+		'type' => MENU_CALLBACK,
+	);
+	
+	$items['invalid_browser'] = array(
+		'title'=>'Invalid Browser Version',
+		'page callback' => 'browser_page_generate',
+		'access callback' => true,
+		'type' => MENU_CALLBACK,
+	);
+	
+	$items['dashboard/configuration_settings'] = array(
+		'title' => 'Configuration Settings',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('configuration_settings'),
+		'access arguments' => array('administer site configuration'),
+		'weight' => 5,
+		'type' => MENU_NORMAL_ITEM
+    );
+	
+	return $items;
+}
+
+
+function browser_page_generate(){
+	print '<p>This site is best viewed in the latest browsers (i.e <a href="http://www.microsoft.com/en-us/download/details.aspx?id=43">Internet Explorer 8</a>, 
+		<a href="http://www.mozilla.org/en-US/firefox/new/">Mozilla Firefox 8</a>,<a href="https://www.google.com/intl/en/chrome/browser/">Google Chrome</a>). We recommend that you upgrade your web browser with the latest version.</p>';
+}
+
+function configuration_settings($form, &$form_submit){
+	$form['invoice_details'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Invoice Details'), 
+		'#weight' => 5, 
+		'#collapsed' => FALSE,
+		'#description' => 'Static Content'
+
+	);
+	$form['invoice_details']['header_details_bir'] = array(
+		'#type' => 'textarea',
+		'#title' => 'header Details',
+		'#default_value' => variable_get('header_details_bir','<strong>STAR APPLIANCE CENTER, INC.</strong> <br  />e-Store <br  />SM Megamall Building corner EDSA <br  />Brgy. Wack-Wack, Mandaluyong City <br  />Tel. No.: (+63) 2 831-8000 loc. 3502 <br  />VAT Reg.: TIN 000-086-204-000<br  />')
+	);
+	$form['invoice_details']['footer_details_bir'] = array(
+		'#type' => 'textarea',
+		'#title' => 'Footer Details',
+		'#default_value' => variable_get('footer_details_bir','<strong>BIR Permit No. 0813-116-00272CBA/AR</strong><br /><strong>e-Store Selling System version 1.0</strong><br /><strong>Effectivity date of permit:  August 1, 2013</strong><br /><strong>Document Range Convention of Sales Invoice (Series of 423-0000000001 – 423-9999999999)</strong>')
+	);
+	$form['folder'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Folder'), 
+		'#weight' => 5, 
+		'#collapsed' => FALSE,
+		'#description' => 'The path start at <Site Root Folder>/'
+
+	);
+	
+	$form['folder']['folder_inbound'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Inbound (MMS,Sku Update, Begining Inventory & Inventory Update)',
+		'#default_value' => variable_get('folder_inbound','inbound/')
+	);
+	$form['folder']['folder_bdo'] = array(
+		'#type' => 'textfield',
+		'#title' => 'BDO',
+		'#default_value' => variable_get('folder_bdo','bdo/')
+	);
+	$form['folder']['folder_2go_csv'] = array(
+		'#type' => 'textfield',
+		'#title' => '2GO Inbound',
+		'#default_value' => variable_get('folder_2go_csv','2GO/csv/')
+	);
+	$form['folder']['folder_2go_xls'] = array(
+		'#type' => 'textfield',
+		'#title' => '2GO Outbound',
+		'#default_value' => variable_get('folder_2go_xls','2GO/xls/')
+	);
+	
+	$form['inbound_filenames'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Inbound Filename'), 
+		'#weight' => 6, 
+		'#collapsed' => FALSE,
+		'#description' => "if you want to add token parameter date use this fomat [(date php format)] "
+
+	);
+	
+	$form['inbound_filenames']['itemmasterfile'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Itemmaster File',
+		'#default_value' => variable_get('itemmasterfile','ID0370423[mdy]')
+	);
+	
+	$form['inbound_filenames']['skuupdate'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Sku Update File',
+		'#default_value' => variable_get('skuupdate','IF0370423[mdy]')
+	);
+	$form['inbound_filenames']['tkstore'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Beginning Inventory File',
+		'#default_value' => variable_get('tkstore','sacistore[mdy]')
+	);
+	$form['inbound_filenames']['transfile'] = array(
+		'#type' => 'textfield',
+		'#title' => 'Invetory Update',
+		'#default_value' => variable_get('transfile','0370423[mdY]')
+	);
+	
+	$form['email_generator'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Email Admin'), 
+		'#weight' => 7, 
+		'#collapsed' => FALSE,
+		'#description' => " "
+
+	);
+	
+	$form['email_generator']['bdo'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Email BDO Inbound'), 
+		'#weight' => 1, 
+		'#collapsed' => FALSE,
+		'#description' => "Email for BDO Inbound"
+
+	);
+	
+	$form['email_generator']['bdo']['bdo_email_to'] = array(
+		'#type' => 'textarea',
+		'#title' => 'TO',
+		'#default_value' => variable_get('bdo_email_to','joy.chua@sm-mci.com,Shirley.D.Lim@sm-shoemart.com')
+	);
+	$form['email_generator']['bdo']['bdo_email_cc'] = array(
+		'#type' => 'textarea',
+		'#title' => 'CC',
+		'#default_value' => variable_get('bdo_email_cc','rina.overture@sm-mci.com,elcyn.overture@sm-mci.com')
+	);
+	
+	$form['email_generator']['2go'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Email 2GO'), 
+		'#weight' => 2, 
+		'#collapsed' => FALSE,
+		'#description' => "Email for 2GO."
+
+	);
+	
+	$form['email_generator']['2go']['2go_email_to'] = array(
+		'#type' => 'textarea',
+		'#title' => 'TO',
+		'#default_value' => variable_get('2go_email_to','karren_alcosero@2go.com.ph,alphard_samson@2go.com.ph')
+	);
+	$form['email_generator']['2go']['2go_email_cc'] = array(
+		'#type' => 'textarea',
+		'#title' => 'CC',
+		'#default_value' => variable_get('2go_email_cc','joy.chua@sm-mci.com,Shirley.D.Lim@sm-shoemart.com,rina.overture@sm-mci.com,elcyn.overture@sm-mci.com')
+	);
+	
+	$form['email_generator']['transmital'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Email SACI Transmital'), 
+		'#weight' => 3, 
+		'#collapsed' => FALSE,
+		'#description' => "Email for  SACI Transmital."
+	);
+	
+	$form['email_generator']['transmital']['transmital_email_to'] = array(
+		'#type' => 'textarea',
+		
+		'#title' => 'TO',
+		'#default_value' => variable_get('transmital_email_to',"p.ferrer@spinweb.ph,ecd@mci.com.ph,jyc@mci.com.ph,elcyn.cubillan@gmail.com,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com,salesaudit.saci.ho@sm-shoemart.com,salesaudit2.saci.ho@sm-shoemart.com,marjorie.r.quirimit@sm-shoemart.com")
+	);
+	
+	$form['email_generator']['outbound'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Email Outbound Report'), 
+		'#weight' => 3, 
+		
+		'#collapsed' => FALSE,
+		'#description' => "Email for Outbound Report."
+	);
+	$form['email_generator']['outbound']['mms_outbound_email_to'] = array(
+		'#type' => 'textarea',
+		'#title' => 'MMS TO',
+		'#default_value' => variable_get('mms_outbound_email_to',"p.ferrer@spinweb.ph,ecd@mci.com.ph,jyc@mci.com.ph,elcyn.cubillan@gmail.com,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com")
+	);
+	
+	$form['email_generator']['outbound']['csa_outbound_email_to'] = array(
+		'#type' => 'textarea',
+		'#title' => 'CSA TO',
+		
+		'#default_value' => variable_get('csa_outbound_email_to',"p.ferrer@spinweb.ph,ecd@mci.com.ph,jyc@mci.com.ph,elcyn.cubillan@gmail.com,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com")
+	);
+	
+	$form['email_generator']['stock_notification'] = array(
+		'#type' => 'fieldset', 
+		'#title' => t('Email Stock Notification'), 
+		'#weight' => 4, 
+		
+		'#collapsed' => FALSE,
+		'#description' => "Email for Stock Notification."
+	);
+	
+	$form['email_generator']['stock_notification']['stock_notification_to'] = array(
+		'#type' => 'textarea',
+		'#title' => 'Stock Notification To',
+		
+		'#default_value' => variable_get('stock_notification_to',"jyc@mci.com.ph,p.ferrer@spinweb.ph,ecd@mci.com.ph,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com,ferrer_princesse@yahoo.com")
+	);
+	
+	
+	return system_settings_form($form);
+	// $form;
+}
+
+
+function saci_transmital_pdf($dategenerate,$cron_function=""){
+	global $base_root;
+	$items_array = array();
+	$view = views_get_view('list_of_transaction');
+    $view->set_display('page_invoice_only');
+    $view->exposed_input['created']['value']['date'] = $dategenerate;
+   	$view->render();
+    $array = $view->result;
+	
+	if(count($array)==0){
+		if($cron_function!=""){
+			$elements = no_transmital_pdf_generator($dategenerate);	
+			$params = array('file'=>$elements['filepath']);
+			$attachment = array(
+				'filecontent' => $elements['filepath'],
+				'filename' => $elements['filename'],
+				'filemime' => 'application/pdf'
+			);
+		}
+		$message_email = 'No Transaction as of '.date("F d, Y",strtotime($dategenerate));
+	}else{	
+		foreach($array as $order_value){
+			$order = uc_order_load($order_value->order_id);
+			$invoice = db_select("checkout_vat_inc","cvi")->fields("cvi",array("id"))->condition("cvi.order_id",$order_value->order_id)->execute()->fetchField();
+			$invoice ="423-".str_pad((int)$invoice, 10, "0", STR_PAD_LEFT);
+			foreach($order->products as $value){
+				$upc_barcode = db_select("field_data_field_barcode","fb")->fields("fb",array("field_barcode_value"))->condition("fb.entity_id",$value->nid)->execute()->fetchField();
+				if(isset($items_array['front'][$value->model] )){
+						$items_array['front'][$value->model]['qty'] += $value->qty;
+				}else{
+						$items_array['front'][$value->model]['title'] = $value->title;
+						$items_array['front'][$value->model]['qty'] = $value->qty;
+						$items_array['front'][$value->model]['upc'] = $upc_barcode;
+				}
+				$items_array['body'][$invoice][$value->model]['title'] = $value->title;
+				$items_array['body'][$invoice][$value->model]['qty'] = $value->qty;
+				$items_array['body'][$invoice][$value->model]['upc'] = $upc_barcode;
+				$items_array['body'][$invoice][$value->model]['awb'] = $order_value->uc_shipments_tracking_number;
+			}
+		}
+		$elements = transmital_pdf_generator($items_array,$dategenerate,$cron_function);	
+		$params = array('file'=>$elements['filepath']);
+		$attachment = array(
+			'filecontent' => $elements['filepath'],
+			'filename' => $elements['filename'],
+			'filemime' => 'application/pdf'
+		);
+		$message_email = 'Automated Transmittal Slip & Packing List as of '.date("F d, Y",strtotime($dategenerate));
+	}
+	if($cron_function!=""){
+		$email = EMAIL_SACITRANSMITAL_TO;
+		$module = 'automation_process_file';
+		$key = 'key';
+		$language = language_default();
+		$from = null;
+		$send = FALSE;
+		$message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+		$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+		$message['subject'] = "Transmittal Slip & Packing List - ".date("F d, Y",strtotime($dategenerate));
+		$message['body'] = array();
+		$message['body'][] = $message_email;
+		$message['body'][] = '';
+		$message['body'][] = 'Thanks,';
+		$message['body'][] = '';
+		$message['body'][] = 'SM Appliance Center';
+		if(count($attachment)>0){
+			$message['params']['attachments'][] = $attachment;	
+		}
+		// Retrieve the responsible implementation for this message.
+		$system = drupal_mail_system($module, $key);
+		// Format the message body.
+		$message = $system->format($message);
+		// Send e-mail.
+		if($system->mail($message)){}
+	}else{
+		if(count($array)==0){
+			return array('status'=> false, 'message'=>'No Transaction for '.date("F d, Y",strtotime($dategenerate)));
+		}else{
+			return array('status'=> true, 'message'=>$base_root."/outbound/xend/".$elements['filename']);
+			
+		}
+	}
+	
+}
+
+function transmital_pdf_generator($items_array,$dategenerate,$cron=""){
+	$html = "";
+	$file_include = MMS_FILE_PATH_ROOT.drupal_get_path('module','mms_generator').'/dompdf/dompdf_config.inc.php';
+	require_once($file_include);
+	$html .= '<html><body>';
+	$html .= '<h3>STAR APPLIANCE CENTER INC.</h3>';
+	$html .= '<h4>e-Store Warehouse</h4>';
+	$html .= '<p>SM Megamall Building corner EDSA <br /> Brgy. Wack-Wack, Mandaluyong City</p>';
+	$html .= '<h3 style="text-align:center;">TRANSMITTAL SLIP</h3>';
+	$html .= '<table style="width:100%;" border="1">
+				<tr>
+					<td style="width:20%;">ITEMCODE</td>
+					<td style="width:60%;">DESCRIPTION</td>
+					<td style="width:20%;">QUANTITY</td>
+				</tr>';
+	foreach($items_array['front'] as $model => $itemvalue)
+		$html .= '<tr><td>'.$itemvalue['upc'].'</td><td>'. $itemvalue['title'].'</td><td>'. $itemvalue['qty'].'</td></tr>';			
+	$html .= '</table>';
+	$html .= '<table style="width:100%;page-break-after:always;">
+				<tr>
+					<td style="width:20%;" align="left">
+					<br />
+					<br />
+						<span>Prepared by:</span><br />
+						<span>________________________</span><br />
+						<span>Name:</span><br />
+						<span>Date:</span><br />
+						<span>Time:</span>
+					</td>
+					<td style="width:60%;">&nbsp;</td>
+					<td style="width:20%;" align="left">
+					<br />
+					<br />
+						<span>Received by:</span><br />
+						<span>________________________</span><br />
+						<span>Name:</span><br />
+						<span>Date:</span><br />
+						<span>Time:</span><br />
+					</td>
+			</tr>
+		</table>';
+	$row = 1;
+	foreach($items_array['body'] as $invoice_number => $items_generated){
+		$stylecount = (($row)<count($items_array['body']))?'page-break-after:always;':'';
+		$html .= '<div style="'.$stylecount.'">';
+		$html .= '<table style="width:100%;margin-bottom:10px;" border="1">
+				<tr>
+					<td style="width:15%;">TRACKINGNUMBER</td>
+					<td style="width:15%;">ITEMCODE</td>
+					<td style="width:50%;">DESCRIPTION</td>
+					<td style="width:10%;">QUANTIY</td>
+					<td style="width:10%;">AWB</td>
+				
+				</tr>';
+		foreach($items_generated as $sku => $item_details){
+			$awb_number_generate = (empty($item_details['awb']))?'':$item_details['awb'];
+			$html .= '<tr><td>'.$invoice_number.'</td><td>'. $item_details['upc'].'</td><td>sku -'. $sku.' | '.$item_details['title'].'</td><td>'. $item_details['qty'].'</td><td>'.$awb_number_generate.'</td></tr>';						
+		}
+		$html .= '</table>';
+		$html .= '</div>';	
+		$row++;
+	}
+	$html .= '</body></html>';
+	$filepath = MMS_FILE_PATH_ROOT."outbound/xend/";
+	$filename = "SACI_TRANSMITTAL_".date("mdY",strtotime($dategenerate)).".pdf";
+	if(file_exists($filepath.$filename))
+		unlink($filepath.$filename);
+	$dompdf = new DOMPDF(); 
+	$dompdf->load_html($html);
+	$dompdf->set_paper("A3","landscape");
+	$dompdf->render();
+	$pdf = $dompdf->output();
+	$objectfile = file_put_contents($filepath.$filename, $pdf);
+		if($objectfile){
+			if($cron!=""){
+				return array('filename'=>$filename,'filepath'=>$filepath.$filename);	
+			}else{
+				header('Cache-Control: public');
+				header('Content-Type: application/pdf');
+				header('Content-Disposition: attachment; filename="'.$filename.'"');
+				readfile($filepath.$filename);
+				die(); 	
+			}
+			
+		}else{
+			return array('status'=>false,'message'=>'Failed to generate file');	
+		}
+
+	
+}
+
+function no_transmital_pdf_generator($dategenerate){
+	$html = "";
+	$file_include = MMS_FILE_PATH_ROOT.drupal_get_path('module','mms_generator').'/dompdf/dompdf_config.inc.php';
+	require_once($file_include);
+	$html .= '<html><body>';
+	$html .= '<h3>STAR APPLIANCE CENTER INC.</h3>';
+	$html .= '<h4>e-Store Warehouse</h4>';
+	$html .= '<p>SM Megamall Building corner EDSA <br /> Brgy. Wack-Wack, Mandaluyong City</p>';
+	$html .= '<h3 style="text-align:center;">TRANSMITTAL SLIP</h3>';
+	$html .= '<table style="width:100%;" border="1">
+				<tr>
+					<td style="width:20%;">ITEMCODE</td>
+					<td style="width:60%;">DESCRIPTION</td>
+					<td style="width:20%;">QUANTITY</td>
+				</tr>';
+	$html .= '</table>';
+	$html .= '<table style="width:100%;">
+				<tr>
+					<td style="width:20%;" align="left">
+					<br />
+					<br />
+						<span>Prepared by:</span><br />
+						<span>________________________</span><br />
+						<span>Name:</span><br />
+						<span>Date:</span><br />
+						<span>Time:</span>
+					</td>
+					<td style="width:60%;">&nbsp;</td>
+					<td style="width:20%;" align="left">
+					<br />
+					<br />
+						<span>Received by:</span><br />
+						<span>________________________</span><br />
+						<span>Name:</span><br />
+						<span>Date:</span><br />
+						<span>Time:</span><br />
+					</td>
+			</tr>
+		</table>';
+	$html .= '</body></html>';
+	$filepath = MMS_FILE_PATH_ROOT."outbound/xend/";
+	$filename = "SACI_TRANSMITTAL_".date("mdY",strtotime($dategenerate)).".pdf";
+	if(file_exists($filepath.$filename))
+		unlink($filepath.$filename);
+	$dompdf = new DOMPDF(); 
+	$dompdf->load_html($html);
+	$dompdf->set_paper("A3","landscape");
+	$dompdf->render();
+	$pdf = $dompdf->output();
+	$objectfile = file_put_contents($filepath.$filename, $pdf);
+	if($objectfile){
+		return array('filename'=>$filename,'filepath'=>$filepath.$filename);	
+	}else{
+		return array('status'=>false,'message'=>'Failed to generate file');	
+	}
+}
+
+function outbound_mms_file($dategenerate,$cron_fetch=""){
+	global $base_root;
+	/*
+		File Path Process;
+	*/
+	$sequence_limit_db = 999;
+	$view = views_get_view('list_of_transaction');
+    $view->set_display('page_invoice_only');
+    $view->exposed_input['created']['value']['date'] = $dategenerate;
+   	$view->render();
+    $array = $view->result;
+	if(count($array)==0){
+				if($cron_fetch!=""){
+					$message = drupal_mail('mms_generator', 'key', EMAIL_MMS_OUTBOUND_TO, language_default(), array(), null, FALSE);
+					$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+					$message['subject'] = "[T1 Outbound File] No Transaction file as of ".date("F d, Y",strtotime($dategenerate));
+					$message['body'] = array();
+					$message['body'][] = 'No Transaction file available as of '.date("m/d/Y",strtotime($dategenerate)).".";
+					$message['body'][] = '--SM Appliance Team';
+					// Retrieve the responsible implementation for this message.
+					$system = drupal_mail_system($module, $key);
+					// Format the message body.
+					$message = $system->format($message);
+					// Send e-mail.
+					if($system->mail($message)){
+						
+					}
+				}else{
+					return array("status"=>false,
+					"message"=>"NO Transaction for date: ".date("F d,Y",strtotime($dategenerate)));
+				}
+	}else{
+		$startdate = strtotime($dategenerate." ".date("g:i:s"));
+		$default_generate = array(
+			'selling_date' => date("ymd",strtotime($dategenerate)),
+			'branch_code_4' => 0423,
+			'company_code' => 037
+		);
+		$checktablecount = db_select("uc_sequence_mms","usm")->fields("usm",array("id"))->execute()->rowCount();
+		if($sequence_limit_db == $checktablecount){
+			db_query("TRUNCATE TABLE {uc_sequence_mms}");
+		}
+		$fetch_sequence_id = db_select("uc_sequence_mms","usm")->fields("usm",array("id"))->condition("usm.date",$dategenerate)->execute()->fetchField();
+		if(!$fetch_sequence_id){
+			db_insert('uc_sequence_mms')->fields(array('date' => $dategenerate))->execute();
+			$fetch_sequence_id = db_select("uc_sequence_mms","usm")->fields("usm",array("id"))->condition("usm.date",$dategenerate)->execute()->fetchField();
+		}
+		/*
+			PREFIX FILE FORMAT TO OUTBOUND MMS
+		*/
+		//$format_file = "T1".$default_generate['selling_date'].".".str_pad($fetch_sequence_id, 3, "0", STR_PAD_LEFT).".".$default_generate['company_code'].$default_generate['branch_code_4'];
+		//str_pad($fetch_sequence_id, 3, "0", STR_PAD_LEFT)".."
+		$format_file = "T1".$default_generate['selling_date'].".001."."0370423";
+		$mms_generate = generate_outbound_mms_file($array,$dategenerate,$format_file);
+		if($mms_generate['status']==false){
+			return array("status"=>false,"message"=>"Fail ".$mms_generate['message']);
+		}else{
+			if($cron_fetch!=""){
+				$access = array('host' => '10.101.1.31','user' => 'MMSFiles','pass' => 'mmsftppw');
+				//$ftp_path = "SACI-TEST/".$format_file.".zip";
+				$ftp_path = $format_file.".zip";
+				$message_process = t("MMS Outbound");
+				ftp_generate($access,$mms_generate['message'],$ftp_path,$message_process);	
+				$enddate = strtotime($dategenerate." ".date("g:i:s"));
+				$transaction_batch_id = db_select("z_report_logs","zrl")->fields("zrl",array("transaction_batch_id"))->condition("zrl.filename",$format_file.".zip")->execute()->fetchField();
+				$arrainsertparams = array(
+					'filename' =>$format_file.".zip" ,
+					'start_datetime' => $startdate,
+					'end_datetime' => $enddate,
+					'totalcount'=>$mms_generate['transaction_outbound_row'],
+					'totalamount'=>$mms_generate['transaction_outbound_total'],
+					'batchamount'=>$mms_generate['transaction_outbound_total'],
+					'nooftrx'=>count($array),
+					'totaltrxammount'=>$mms_generate['transaction_outbound_total'],
+					'notrxlines'=>$mms_generate['transaction_outbound_row']
+				);
+				if($transaction_batch_id){
+					db_update('z_report_logs')->fields($arrainsertparams)->condition('transaction_batch_id',$transaction_batch_id)->execute();
+				}else{
+					db_insert('z_report_logs')->fields($arrainsertparams)->execute();	
+				}
+			}else{
+				$statusreturn['status'] = true;
+				$statusreturn['message']  = $base_root."/outbound/zip_file/".$format_file.".zip";
+				return $statusreturn ;
+				/*
+					header('Cache-Control: public');
+					header('Content-Type: application/zip');
+					header('Content-Disposition: attachment; filename="'.$format_file.'.zip"');
+					readfile($mms_generate['message']);	
+				*/
+			}
+		}
+	}
+}
+function generate_outbound_mms_file($array,$dategenerate,$file_format){
+	$totalvalue = 0;
+	$totalcountrow = 0;
+	$file_include = MMS_FILE_PATH_ROOT.drupal_get_path('module','mms_generator').'/object/classoutput.php';
+	require_once($file_include);
+	$object = new MMS_CLASS;
+	$filesystemcheck = array();
+	$filepath = MMS_FILE_PATH_ROOT."outbound/zip_file/";
+	$tempdosfilepath = MMS_FILE_PATH_ROOT."outbound/sales_file/dos/";
+	$default_generate = array(
+		'branch_code_3' => 423,
+		'company_code' => 037,
+		'store_number' => 0423,
+		'selling_date' => date("ymd",strtotime($dategenerate)),
+		'format_multiple' => 1000,
+		'next_line' => "\r\n"
+	);
+	$write_content = "";
+	$sequence = 1;
+	$limit_sequence =497;
+	foreach($array as $value):
+		$order = uc_order_load($value->order_id);
+		$totalvalue += $order->order_total;
+		foreach($order->products as $order_value):
+			$upc_barcode = db_select("field_data_field_barcode","fdfb")->fields("fdfb",array('field_barcode_value'))->condition("fdfb.entity_id",$order_value->nid)->execute()->fetchField();
+			if($upc_barcode):
+				$transaction_total_qty += $quantity_convert = ($order_value->qty*$default_generate['format_multiple']);
+				$price_convert = (number_format($order_value->price,2,'.','')*$default_generate['format_multiple']);
+				$transaction_total_price += $total_price = $price_convert*$order_value->qty;
+				 //$default_generate['store_number'].
+				$write_content .= "0423/".$default_generate['selling_date']."/1/0/1/".str_pad((int)$sequence, 3, "0", STR_PAD_LEFT)."/000/05/01/810/0//".$quantity_convert."/+/".$price_convert."//+/".$total_price."/+/0//".substr($upc_barcode, 0, 12)."////0///RET/0/".$default_generate['selling_date']."////////+//".$default_generate['next_line'];
+				$totalcountrow++;
+				if($sequence<=$limit_sequence)
+					$sequence++;
+				else
+					$sequence = 0;	
+			endif;
+		endforeach;
+	endforeach;
+	$write_content .= "0423/".$default_generate['selling_date']."/1/0/1/".str_pad((int)$sequence, 3, "0", STR_PAD_LEFT)."/000/04/CA/810/0/".$transaction_total_price."/+/////0/////".$default_generate['next_line'];
+	$write_content .= "0423/".$default_generate['selling_date']."/1/0/1/000/000/03/01/810/0/111111/0423/PHP/0//0////0//0///////".$default_generate['selling_date']."/".$default_generate['next_line'];
+	$write_content .= "0423/".$default_generate['selling_date']."/1/9/0/000/000/11/5001//CA/".$transaction_total_price."/+/////".$default_generate['next_line'];
+	$write_content .= "0423/".$default_generate['selling_date']."/1/9/0/000/000/12/5001//CA/".$transaction_total_price."/+/////".$default_generate['next_line'];
+	$write_content .= "0423/".$default_generate['selling_date']."/000/9/0/000/000/99/".$default_generate['selling_date']."/".$default_generate['next_line'];
+	$totalcountrow += 5;
+	$formating = array(
+		"DOS"=> $write_content,
+		"LOG"=> number_format($transaction_total_qty / $default_generate['format_multiple'],3,'.','').",".number_format($transaction_total_price / $default_generate['format_multiple'],3,'.','')
+	);
+	foreach($formating as $key_type => $value_format){
+		$fp = fopen($tempdosfilepath.$file_format.".".$key_type, 'w');
+		fwrite($fp,$value_format);
+		fclose($fp);
+	}
+	$file_status_active = true;
+	foreach($formating as $key_type => $value_format){
+		if(!file_exists($tempdosfilepath.$file_format.".".$key_type)){
+			$file_status_active = false;
+		}else{
+			$filesystemcheck[] = $tempdosfilepath.$file_format.".".$key_type;	
+		}
+	}
+	if($file_status_active == true){
+			$zipfile = $filepath.$file_format.".zip";
+			if(file_exists($zipfile)){
+				if(unlink($zipfile))
+					$object->zip_file_compressor($filesystemcheck,$zipfile,true,$tempdosfilepath);
+			}else{
+				$object->zip_file_compressor($filesystemcheck,$zipfile,true,$tempdosfilepath);
+			}
+			
+			if(file_exists($zipfile)){
+				foreach($formating as $key_type => $value_format){
+					if(file_exists($tempdosfilepath.$file_format.".".$key_type))
+						unlink($tempdosfilepath.$file_format.".".$key_type);
+				}
+			}
+			return array("status"=>true,"message"=>$zipfile,"transaction_outbound_total"=>$totalvalue,"transaction_outbound_row"=>$totalcountrow);
+	}else{
+		return array("status"=>false,"message"=>"File Compress Failed");
+	}
+}
+
+function ftp_generate($access,$zipfile,$ftp_path,$message_process){
+	/*
+		$ftp_server = "10.101.1.31"; 
+		$ftp_user_name = "MMSFiles";
+		$ftp_user_pass = "mmsftppw";
+		$zipfile
+		"SACI-TEST/".$zipmainpath
+	*/
+	$ftp_server = $access['host']; 
+	$ftp_user_name = $access['user'];
+	$ftp_user_pass = $access['pass'];
+	$file = $zipfile;
+	$fp = fopen($file, 'r+');
+	$conn_id = ftp_connect($ftp_server);
+	$login_result = ftp_login($conn_id, $ftp_user_name, $ftp_user_pass);
+	if(ftp_fput($conn_id,$ftp_path , $fp, FTP_BINARY)){
+		ftp_close($conn_id);
+		fclose($fp);
+		watchdog( 'cron', 'Cron file transfer in !cronftp Success.', array('!cronftp' => $message_process), WATCHDOG_NOTICE);
+	}else{
+		ftp_close($conn_id);
+		fclose($fp);
+	}
+}

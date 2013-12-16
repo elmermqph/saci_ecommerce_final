@@ -1,0 +1,18 @@
+#postscript-top {
+    background: #FEFEFE;
+    padding: 5px;
+    width: 950px;
+}
+h1.title{display:none;}
+
+#pid-cart #uc-cart-view-form #edit-actions{
+margin-top: 8px;
+}
+
+#pid-cart #postscript-bottom-wrapper{
+margin-top: 10px;
+}
+
+#pid-cart #content-messages{
+display:none;
+}

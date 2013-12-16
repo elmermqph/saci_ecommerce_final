@@ -1,0 +1,39 @@
+#content #block-menu-menu-control-panel{
+  position: absolute;
+    right: 0;
+    top: 0;
+}
+#content #block-menu-menu-control-panel h2{
+display:none;
+}
+#content #block-menu-menu-control-panel ul li{
+float:left;
+    list-style: none outside none;
+}
+#content #block-menu-menu-control-panel ul li a{
+text-decoration:underline;
+}
+#header-top #block-menu-menu-control-panel{
+   background: none repeat scroll 0 0 #00122E !important;
+    left: 0;
+    margin-bottom: 0;
+    position: absolute;
+    top: 0;
+    z-index: 100;
+   width: 150px;
+}
+
+#header-top #block-menu-menu-control-panel ul li a,
+#header-top #block-menu-menu-control-panel h2
+{
+color:#fff;
+}
+
+#uc-cart-checkout-review-form #edit-back{
+float:right;
+margin-left: 15px;
+}
+
+#views-exposed-form-members-profile-page #edit-mail-wrapper{
+	display:none;	
+}

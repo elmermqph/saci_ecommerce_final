@@ -1,0 +1,5 @@
+name = BDO Custom Payment
+description = BDO Custom Payment.
+dependencies[] = uc_payment
+package = Custom Module
+core = 7.x

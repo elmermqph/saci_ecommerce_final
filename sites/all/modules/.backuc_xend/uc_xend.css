@@ -1,0 +1,11 @@
+/**
+ * @file
+ * Styles for uc_xend module.
+ */
+.xend-logo {
+  vertical-align: middle;
+}
+
+.pane-table .form-item {
+  display: inline;
+}

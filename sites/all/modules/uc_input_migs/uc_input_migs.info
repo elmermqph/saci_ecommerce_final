@@ -1,0 +1,4 @@
+name = SM Appliance Manual Input
+description = UC Migs Manual Input
+dependencies[] = uc_xend
+core = 7.x 

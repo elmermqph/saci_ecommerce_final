@@ -1,0 +1,1246 @@
+<?php 
+if(!defined("MMS_FILE_PATH_ROOT"))
+	define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
+if(!defined("BDO_PREFIX"))
+	define("BDO_PREFIX","BDO");
+if(!defined("OUTBOUND_2GO_PREFIX"))
+	define("OUTBOUND_2GO_PREFIX","2GO_SACI_");	
+if(!defined("INBOUND_2GO_PREFIX"))
+	define("INBOUND_2GO_PREFIX","AWB");		
+if(!defined("SACI_PREFIX"))
+	define("SACI_PREFIX","423-");		
+/*
+DEV EMAIL
+if(!defined("EMAIL_2GO_TO"))
+	define("EMAIL_2GO_TO","e.quilala@spinweb.ph");		
+if(!defined("EMAIL_2GO_CC"))
+	define("EMAIL_2GO_CC","elmermartin.quilala@gmail.com");		
+if(!defined("EMAIL_BDO_TO"))
+	define("EMAIL_BDO_TO","e.quilala@spinweb.ph");		
+if(!defined("EMAIL_BDO_CC"))
+	define("EMAIL_BDO_CC","elmermartin.quilala@gmail.com");		
+
+*/
+
+
+/*
+LIVE EMAIL
+*/
+
+/*
+	EMAIL RECIEVER TO & CC FROM 2GO outbound Excel
+		
+
+*/
+if(!defined("EMAIL_2GO_TO"))
+	define("EMAIL_2GO_TO",variable_get('2go_email_to',"karren_alcosero@2go.com.ph,alphard_samson@2go.com.ph"));		
+if(!defined("EMAIL_2GO_CC"))
+	define("EMAIL_2GO_CC",variable_get('2go_email_cc',"joy.chua@sm-mci.com,Shirley.D.Lim@sm-shoemart.com,rina.overture@sm-mci.com,elcyn.overture@sm-mci.com"));	
+	
+/*
+	EMAIL RECIEVER TO & CC FROM BDO inbound CSV
+	
+*/
+
+if(!defined("EMAIL_BDO_TO"))
+	define("EMAIL_BDO_TO",variable_get('bdo_email_to','joy.chua@sm-mci.com,Shirley.D.Lim@sm-shoemart.com'));		
+if(!defined("EMAIL_BDO_CC"))
+	define("EMAIL_BDO_CC",variable_get('bdo_email_cc','rina.overture@sm-mci.com,elcyn.overture@sm-mci.com'));		
+
+/*
+ * Implements hook_permission
+ */
+function shipping_accomodation_permission(){
+	return array(
+		'stock allocation' => array(
+			'title' => t('Shipping Accomodation'),
+			'description' => 'Shipping accomodations Content form'
+		),
+		'shipping rate' => array(
+			'title' => t('Category Shipping Rate'),
+			'description' => 'Category Shipping Rate'
+		),
+		'dashboard portal' => array(
+			'title' => t('Dashboard Portal Access'),
+			'description' => 'Dashboard Portal Panel'
+		),
+		
+	);
+}
+
+/*
+ * Implements hook_menu
+ *
+ */
+
+
+function shipping_accomodation_menu(){
+	$items['dashboard/shipping_rate'] = array(
+		'title'=> 'Shipping Rate',
+        'page callback' => 'category_price',
+        'access arguments' => array('shipping rate'),
+		'access callback' => 'user_access',
+		'theme arguments' => array('admin_theme'),
+        'type' => MENU_CALLBACK,
+    );
+	$items['download-generate-pdf'] = array(
+        'page callback' => 'download_invoice',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['download-generate-pdf-bdo'] = array(
+        'page callback' => 'download_order_bdo',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['stock/checker'] = array(
+        'page callback' => 'stock_checker_notifaction',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['stock/expire'] = array(
+        'page callback' => 'cron_expire_stock',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['verification/checkout'] = array(
+        'page callback' => 'stock_allocation_summary',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['dashboard/location/export'] = array(
+        'page callback' => 'export_location',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	$items['dashboard/2go/export'] = array(
+		'title'=>'2GO AWB Outbound',
+        'page callback' => 'drupal_get_form',
+		'page arguments' => array('awb_2go_excel_form'),
+      	'access arguments' => array('dashboard portal'),
+		'access callback' => 'user_access',
+		'theme arguments' => array('admin_theme'),
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['dashboard/location/servicable'] = array(
+		'title'=>'2GO Location Servicable',
+        'page callback' => 'drupal_get_form',
+		'page arguments' => array('awb_2go_location_form'),
+      	'access arguments' => array('dashboard portal'),
+		'access callback' => 'user_access',
+		'theme arguments' => array('admin_theme'),
+        'type' => MENU_CALLBACK,
+    );
+	
+	$items['dashboard/location/export'] = array(
+        'page callback' => 'export_location',
+        'access callback' => true,
+        'type' => MENU_CALLBACK,
+    );
+	
+	
+	$items['dashboard'] = array(
+		'title'=> 'Dashboard',
+        'page callback' => 'portal_page',
+        'access arguments' => array('dashboard portal'),
+		'access callback' => 'user_access',
+		'theme arguments' => array('admin_theme'),
+        'type' => MENU_CALLBACK,
+    );
+	/*
+		CRON RUN FUNCTION 
+			tracking_2go(date("mdY")); //5pm THIS DAY
+			bdo_checker(date("mdY",strtotime("-1 day"))); //END OF THE DAY
+			cron_expire_stock(); //EVERY HOUR
+	*/
+	
+	return $items;
+}
+
+function invoice_number_template($order_id){
+	$sales_invoice = db_select("checkout_vat_inc","cvi")->fields("cvi",array("id"))->condition("cvi.order_id",$order_id)->execute()->fetchField();
+	if($sales_invoice){
+		return "423-".str_pad((int)$sales_invoice, 10, "0", STR_PAD_LEFT);
+	}else{
+		return "";
+	}
+}
+
+
+function export_location(){
+	$filepath = MMS_FILE_PATH_ROOT."sites/default/files/";
+	$filename = "export_2go_location.csv";
+	$csv_convertion[0] = array("Zone Code","Municipality Name","Municipality id","Barangay Name","Barangay id","Status");
+	$query = db_select("uc_zones_barangay","uzb");
+	$query->join("uc_zones_municipality","uzm","uzm.id = uzb.uz_municipality");
+	$query->fields('uzb')
+    ->fields('uzm',array("municipality_name","uz_zone"))
+	->orderBy("uzm.uz_zone","ASC");
+	foreach($query->execute() as $value):
+		$csv_convertion[] = array(
+			$value->uz_zone,
+			$value->municipality_name,
+			$value->uz_municipality,
+			$value->barangay_name,
+			$value->id,
+			$value->delivery_status);
+	endforeach;
+	$fp = fopen($filepath.$filename, 'w');
+	foreach ($csv_convertion as $fields) 
+    	fputcsv($fp, $fields);
+	fclose($fp);
+	header('Cache-Control: public');
+	header('Content-Type: text/csv');
+	header('Content-Disposition: attachment; filename="'.$filename.'"');
+	readfile($filepath.$filename);
+	die(); 	
+}
+
+
+function awb_2go_location_form($form, &$form_submit) {
+		$form['#attributes'] = array('enctype' => "multipart/form-data");
+		$form['location_export'] = array(
+			'#type' => 'markup',
+			'#markup' => '<div class="container-export"><a href="/dashboard/location/export">Download Location Template</a></div>',
+    		'#title' => t('Report Date'),
+		    
+    	);
+		
+		$form['location_import'] = array(
+			'#type' => 'file',
+    		'#title' => t('Import Location'),
+    		'#description' => t('Add/Edit Servicable Location.'),
+    		'#upload_validators' => array('file_validate_extensions' => array(0 => 'csv')),
+		    
+    	);
+		$form['submit_action'] = array(
+			'#type' => 'submit',
+			'#value' => t('Submit'),
+			'#submit' => array('awb_2go_location_submit')
+    	);
+		return $form;
+		
+}
+
+function awb_2go_location_submit($form, &$form_submit) {
+	$file = file_save_upload('location_import', array(
+		'file_validate_extensions' => array('csv'), // Validate extensions.
+		FILE_EXISTS_REPLACE
+	));
+	
+	$test = array();
+	$row = 1;
+	if (($handle = fopen($file->uri, 'r')) !== FALSE) {
+		while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+			if($row != 1):
+					switch($data[6]){
+						case 0:
+							/*
+								Add/Modify Delivery Status/Barangay Name
+									Features included
+										- Changing Barangay status. (condtions of the following)
+											- Valid barangay id.
+										- Modify Barangay Name (condtions of the following)
+											- Valid barangay id.
+										- Add Barangay on Certain City (condtions of the following)
+											- Valid city/municipality id.
+											- Barangay id should be 0
+							*/
+							if($data[4]==0 || $data[4]==NULL){
+								if($data[2]>0){
+									$city_municipality_id = db_select("uc_zones_municipality","uzm")->fields('uzm',array("id"))->condition("uzm.id",$data[2])->execute()->fetchField();
+									if($city_municipality_id){
+										db_insert('uc_zones_barangay')
+										->fields(
+											array(
+												'delivery_status' => $data[5],
+												'barangay_name' => $data[3],
+												'uz_municipality' => $data[2]
+											)
+										)->execute();
+										drupal_set_message("Insert Complete Action: Add/Modify Barangay row: ".$row." of csv file");
+									}else
+										drupal_set_message("City/Municipality id not exist Action: Add/Modify Barangay at row: ".$row." of csv file",'error');	
+								}else
+									drupal_set_message("No City Municipality Action: Add/Modify Barangay at row: ".$row." of csv file",'error');
+							} else {
+								db_update("uc_zones_barangay")
+								->fields(
+									array(
+										"delivery_status"=>$data[5],
+										"barangay_name"=>$data[3]
+									)
+								)->condition('id', $data[4])->execute();
+								drupal_set_message("Update Complete Action: Add/Modify Barangay row: ".$row." of csv file");
+							}
+						break;	
+						case 1:
+							/*
+								Add/Modify City/Municipality
+									Features included
+										- Modify City/Municipality (condtions of the following)
+											- Valid City/Municipality id.
+										- Add City Certain Province (condtions of the following)
+											- Valid zone_code.
+											- City/Municipality should be zero
+											- Barangay Name should "NULL"
+											- Barangay Id should 0
+											- Delivery should 0
+											- You need to export it first before you get the City/Municipality id.
+							*/
+							if($data[2]>0){
+									db_update("uc_zones_municipality")->fields(array("municipality_name"=>$data[5]))->condition('id', $data[2])->execute();
+									drupal_set_message("Update Complete Action: Add/Modify City/Municipality row: ".$row." of csv file");
+							}else{
+								$zone_code = db_select("uc_zones","uz")->fields('uz',array("zone_code"))->condition("uz.zone_code",$data[0])->condition("uz.zone_country_id",608)->execute()->fetchField();
+								if($zone_code){
+									db_insert("uc_zones_municipality")->fields(
+									array(
+											'municipality_name'=>$data[1],
+											'uz_zone'=>$data[0]
+									))->execute();
+									drupal_set_message("Insert Complete Action: Add/Modify City/Municipality row: ".$row." of csv file");
+								}else
+									drupal_set_message("Invalid Zone Code Action: Add/Modify City/Municipality row: ".$row." of csv file","error");
+							}
+						break;
+						default:
+							drupal_set_message("Invalid Action Parameter row: ".$row." of csv file","error");
+						break;	
+					}
+					
+			endif;
+			$row++;
+		}	
+		fclose($handle);
+	}
+}
+
+
+function awb_2go_excel_form($form, &$form_submit) {
+	drupal_add_library('system','ui.datepicker');
+  	drupal_add_js('jQuery(document).ready(function(){jQuery( ".pickadate" ).datepicker({
+      dateFormat: "yy-mm-dd",
+      autoSize: true
+    	});});', 'inline'); 
+		$form['report_date'] = array(
+			 '#type' => 'textfield',
+    		'#title' => t('Report Date'),
+		    '#attributes' => array('class' => array('pickadate')),
+    	);
+		$form['submit_action'] = array(
+			'#type' => 'submit',
+			'#value' => t('Submit'),
+			'#submit' => array('awb_2go_excel_submit')
+    	);
+		return $form;
+		
+}
+
+function awb_2go_excel_submit($form, &$form_submit){
+	excel_array_2go($form_submit['values']['report_date'],"download");
+}
+
+function excel_array_2go($dategenerate,$report_type=""){
+	$excelfilename = OUTBOUND_2GO_PREFIX.$dategenerate.".xls";
+	$view = views_get_view('awb_2go');
+    $view->set_display('page');
+    $view->exposed_input['created']['value']['date'] = $dategenerate;
+   	$view->render();
+    $array = $view->result;
+	if(count($array)>0){
+		$htmlpath = excel_2go($array,$dategenerate);
+		$message_email = '2GO AWB template was successfully uploaded to the FTP folder.';
+	}else{
+		$message_email = 'No transactions for today.';
+	}
+	if($report_type==""){
+		$email = EMAIL_2GO_TO;
+		$module = 'shipping_accomodation';
+		$key = 'key';
+		$language = language_default();
+		$params['headers']['Cc'] = EMAIL_2GO_CC;
+		$from = null;
+		$send = FALSE;
+		$message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+		$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+		$message['subject'] = "2GO AWB Creation";
+		$message['body'] = array();
+		$message['body'][] = 'Hi,';
+		$message['body'][] = '';
+		$message['body'][] = $message_email;
+		$message['body'][] = '';
+		$message['body'][] = '-SM Appliance e-Store';	
+		// Retrieve the responsible implementation for this message.
+		$system = drupal_mail_system($module, $key);
+		// Format the message body.
+		$message = $system->format($message);
+		// Send e-mail.
+		if($system->mail($message)){}
+	}else{
+		 if(count($array)>0){
+			header("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+			header("Content-Disposition: attachment;filename=".$htmlpath['filename']);
+			header("Cache-Control: max-age=0");
+			readfile($htmlpath['filename_path']);
+			die(); 
+		}else{
+			 drupal_set_message(t("No Transaction for !datenow",array("!datenow"=>date("F d, Y",strtotime($dategenerate)))),'warning');
+		}
+	}
+}
+function excel_template_product($array_product,$template=""){
+	$result = ($template=="qty")?0:"";
+	switch($template){
+		case "qty":
+			foreach($array_product as $value):
+				$result += $value->qty;
+			endforeach;
+		break;
+		default:
+			$counting = 0;
+			foreach($array_product as $value):
+				$result .= $value->model." ".$value->qty." ".$value->title;
+				if(($counting+1)<count($array_product))
+					$result .= ",";
+				$counting++;	
+			endforeach;
+		break;
+	}
+	return $result;
+}
+
+function excel_2go($array_elements,$dategenerate){
+	$filepath = MMS_FILE_PATH_ROOT.variable_get('folder_2go_xls','2go/xls/');
+    $excelfilename = OUTBOUND_2GO_PREFIX.$dategenerate.".xls";
+	if(file_exists())
+		unlink($filepath.$excelfilename);
+	$key_row_value = 3;
+	foreach($array_elements as $value){
+		$order = uc_order_load($value->order_id);
+		$uc_zone_name = db_select("uc_zones","uz")->fields("uz",array("zone_name"))->condition("uz.zone_id",$order->delivery_zone)->execute()->fetchField();
+		$array_fetch_element[$key_row_value]['B'.$key_row_value] = $order->delivery_first_name." ".$order->delivery_last_name;
+		$array_fetch_element[$key_row_value]['C'.$key_row_value] = $order->delivery_street1." ".$order->delivery_street2 ." ".$order->delivery_city." ".$uc_zone_name;
+		$array_fetch_element[$key_row_value]['H'.$key_row_value] = excel_template_product($order->products);
+		$array_fetch_element[$key_row_value]['I'.$key_row_value] = invoice_number_template($order->order_id);
+		$array_fetch_element[$key_row_value]['J'.$key_row_value] = excel_template_product($order->products,"qty");
+		$array_fetch_element[$key_row_value]['O'.$key_row_value] = $order->order_total - $order->quote['rate'];
+		$array_fetch_element[$key_row_value]['P'.$key_row_value] = $order->delivery_phone;
+		$key_row_value++;	
+	}
+	global $base_root;
+	$array_header = array(
+		'A1' => 'TERR. CODE','B1' => 'CONSIGNEE NAME','C1' => 'ADDRESS','D1' => 'DEST','E1' => 'AREA CODE','F1' => 'AWB/CN#','G1' => 'PICKUP DATE','H1' => 'DESCRIPTION','I1' => 'Sales Invoice','J1' => 'QTY','K1' => 'WEIGHT','L1' => 'DIMENSION','O1' => 'DEC. VALUE',
+		'P1' => 'TEL#','Q1' => 'PACKAGE_CODE','R1' => 'COM. CODE','S1' => 'SPEC. INTS.','T1' => 'PICK UP TIME','U1' => 'RDD',
+		'V1' => 'CNEE_CUST','W1' => 'CNEE_C/O','X1' => 'BOOKING #','L2' => 'L','M2' => 'W','N2' => 'H'
+	);
+	
+	$excel_php = $_SERVER['DOCUMENT_ROOT'] . '/' . drupal_get_path('module','mms_generator') . '/excel/PHPExcel.php';
+	require_once($excel_php);
+	$io_factory = $_SERVER['DOCUMENT_ROOT'] . '/' . drupal_get_path('module','mms_generator') . '/excel/PHPExcel/IOFactory.php';
+	require_once($io_factory);
+	$objPHPExcel = new PHPExcel();
+	$sharedStyle1 = new PHPExcel_Style();
+	$activesheet = $objPHPExcel->getActiveSheet();
+	$objPHPExcel->setActiveSheetIndex(0);
+	$sharedStyle1->applyFromArray(array('borders' => array('top'=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'bottom'=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'left'    => array('style' => PHPExcel_Style_Border::BORDER_THIN),'right'    => array('style' => PHPExcel_Style_Border::BORDER_THIN))));
+    
+    /*END SET STYLE AND BORDER */
+    /*INSERT ELEMENT*/
+	//$excelettercheck[(count($array)+1)].
+	
+	$activesheet->setSharedStyle($sharedStyle1, "A1:"."X".(2+count($array_fetch_element)));
+	$activesheet->mergeCells('L1:N1');
+	foreach($array_header as $header_column => $header_value):
+		$activesheet->getStyle($header_column)->getAlignment()->setHorizontal(PHPExcel_Style_Alignment::HORIZONTAL_CENTER);
+		$activesheet->setCellValue($header_column,$header_value);
+	endforeach;
+	foreach($array_fetch_element as $mainvalue)
+		foreach($mainvalue as $cell_spread_sheet => $value_spead_sheet)
+			$activesheet->setCellValue($cell_spread_sheet,$value_spead_sheet);	
+		
+	
+	
+    $objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel5');
+    //$objWriter->save($filepath.$excelfilename);
+	// We'll be outputting an excel file
+	//header('Content-type: application/vnd.ms-excel');
+	// It will be called file.xls
+	//header('Content-Disposition: attachment; filename="'.$excelfilename.'"');
+	//$objWriter->save($filepath.$excelfilename);
+	$objWriter->save($filepath.$excelfilename);
+	$return['filename'] = $excelfilename;
+    $return['filename_path'] = $filepath.$excelfilename;
+	return $return;
+}
+
+
+
+
+
+function shipping_accomodation_taxonomy_term_update($term){
+	if($term->form_id == "taxonomy_form_term" && $term->vid==3 && $term->op == "Save")
+		category_shipping_rate($term->field_declare_shipping['und'][0]['value'],$term->tid,$term->parent[0]);
+}
+
+function category_shipping_rate($declare_ship,$term_tid,$parent=""){
+	switch($declare_ship){
+		case 0:
+			if($parent>0){
+				$parent_taxonomy = taxonomy_get_parents($term_tid);
+				$parent_value = array(
+					'field_shipping_rate_price' => $parent_taxonomy[$parent]->field_shipping_rate_price['und'][0]['value'],
+					'field_sa_rate' => $parent_taxonomy[$parent]->field_sa_rate['und'][0]['value'],
+					'field_otd_rate' => $parent_taxonomy[$parent]->field_otd_rate['und'][0]['value']
+				);
+				$term_load = taxonomy_term_load($term_tid);
+				$term_load->field_shipping_rate_price['und'][0]['value'] = $parent_value['field_shipping_rate_price'];
+				$term_load->field_sa_rate['und'][0]['value'] = $parent_value['field_sa_rate'];
+				$term_load->field_otd_rate['und'][0]['value'] = $parent_value['field_otd_rate'];
+				taxonomy_term_save($term_load);
+				//dsm($term_load);
+			}
+		break;	
+		case 1:
+			$term_data_list = taxonomy_get_tree(3);
+			$value_view = false;
+			foreach($term_data_list as $term_key => $term_value):
+				if($value_view == true):
+					$term_load = taxonomy_term_load($term_value->tid);
+					if($term_value->tid != $term_tid && $term_load->field_declare_shipping['und'][0]['value'] == 1)
+						break;
+					else{
+						$term_load->field_shipping_rate_price['und'][0]['value'] = $parentsrate['field_shipping_rate_price'];
+						$term_load->field_sa_rate['und'][0]['value'] = $parentsrate['field_sa_rate'];
+						$term_load->field_otd_rate['und'][0]['value'] = $parentsrate['field_otd_rate'];
+						taxonomy_term_save($term_load);
+					}
+				endif;
+				if($term_value->tid == $term_tid):
+					$value_view = true;
+					$term_load = taxonomy_term_load($term_value->tid);
+					$parentsrate = array(
+						'field_shipping_rate_price' => $term_load->field_shipping_rate_price['und'][0]['value'],
+						'field_sa_rate' => $term_load->field_sa_rate['und'][0]['value'],
+						'field_otd_rate' => $term_load->field_otd_rate['und'][0]['value'],
+					);
+				endif;
+			endforeach;
+		break;	
+	}
+	print "Complete";
+}
+
+
+function category_price(){
+		$term_data_list = taxonomy_get_tree(3);
+		$depthline = "";
+		$html =  "<table>";
+		$html .=  "<thead><th>Category Name</th><th>Intracity Rate</th><th>Serviceable Area Rate</th><th>Out of Town Delivery Rate</th><th>Action</th></thead><tbody>";
+		foreach($term_data_list as $valueterm){
+			$taxonomy = taxonomy_term_load($valueterm->tid);
+			for ($i = 1; $i <= $valueterm->depth; $i++) {
+    				$depthline .="-";
+			}
+			if($taxonomy->field_declare_shipping['und'][0]['value'] == 1){
+				$html .= "<tr>";
+				$html .= "<td>".$depthline.$valueterm->name."</td>";
+				$html .= "<td>".$taxonomy->field_shipping_rate_price['und'][0]['value']."</td>";
+				$html .= "<td>".$taxonomy->field_sa_rate['und'][0]['value']."</td>";
+				$html .= "<td>".$taxonomy->field_otd_rate['und'][0]['value']."</td>";
+				$html .= '<td><a href="/taxonomy/term/'.$valueterm->tid.'/edit?destination=dashboard/shipping_rate">edit</a></td>';
+				$html .= "<tr>";
+				
+			}
+			$depthline = "";
+		}
+		$html .= "</tbody></table>";
+		return $html;
+}
+
+function download_invoice(){
+	global $user;
+	$arrayroles = array(3,14,19,12);
+	$shipping = array("payment_received","delivery");
+	$validationuser = false;
+	foreach($arrayroles as $value):
+		if(isset($user->roles[$value]))
+			$validationuser = true;
+	endforeach;	
+
+	if($validationuser==false){
+		if(isset($_GET['title']) && isset($_GET['order_id'])){
+			$query_num = db_select("uc_orders","uo")
+			->fields("uo",array("order_id","order_status"))
+			->condition("uo.order_id",$_GET['order_id'])
+			->condition("uo.uid",$user->uid)
+			->execute();
+			if($query_num->rowCount()==0)
+				die("You can't download this invoice");
+			else{
+				$validationuser = false;
+				$object_generate = $query_num->fetchObject();
+				foreach($shipping as $shipvalue)
+					if($object_generate->order_status==$shipvalue)
+						$validationuser=true;
+			}
+		}else{
+			die("ACCESS DENIED: INVALID PARAMETER");
+		}
+	}
+	if($validationuser == true){
+		$attachment_location = $_SERVER["DOCUMENT_ROOT"] . "/invoice/Sales Invoice_".$_GET['order_id'].".pdf";
+		if(!file_exists($attachment_location)){
+				$path = file_attachment_path($_GET['order_id']);
+				if($path!="FAILED")
+					$attachment_location = $_SERVER["DOCUMENT_ROOT"] . "/".$path;
+				else
+					die('Failed Generate File.');
+		}
+		header('Cache-Control: public');
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: attachment; filename="'.$_GET['title'].'"');
+		readfile($attachment_location);
+		die(); 
+	}else{
+		die("ACCESS DENIED: THIS TRANSACTION IS INCOMPLETE");	
+	}
+}
+
+
+function download_order_bdo(){
+	global $user;
+	global $base_root;
+	$access_control = false;
+	if(isset($_GET['order_id'])){
+		$order = uc_order_load($_GET['order_id']);
+		$arrayroles = array(3,14,19,12);
+		foreach($arrayroles as $value):
+			if(isset($user->roles[$value])){
+				$access_control = true;
+				break;
+			}
+		endforeach;	
+		if($access_control==true || ($order->payment_method == "sandcart_payment" && $order->order_status=="pending" && $order->uid == $user->uid)){
+			$attachment_location = MMS_FILE_PATH_ROOT ."invoice/Order_Details_".$_GET['order_id'].".pdf";
+			if(!file_exists($attachment_location))
+				file_put_contents($attachment_location,file_get_contents($base_root."/bdo/print/".$_GET['order_id']));
+			header('Cache-Control: public');
+			header('Content-Type: application/pdf');
+			header('Content-Disposition: attachment; filename="Order Details.pdf"');
+			readfile($attachment_location);
+			die(); 		
+		}else{
+			die("ACCESS DENIED");	
+		}
+		
+	}
+	
+}
+
+function tracking_2go($date){
+		$filename = MMS_FILE_PATH_ROOT.variable_get('folder_2go_csv','2GO/csv/').INBOUND_2GO_PREFIX.$date.".csv";
+		if (($handle = fopen($filename, 'r')) !== FALSE){
+			$row = 1;
+			while (($data = fgetcsv($handle, 0, ",")) !== FALSE) {
+				if($row>1){
+						$pos = strpos($data[1], SACI_PREFIX);
+						if ($pos !== false) {
+							$status = (empty($data[2]))?0:$data[2];
+							tracking_2go_generate($data[1],$data[0],$status);
+						}else{
+							watchdog("cron","SALES INVOICE : @sales_invoice is invalid format please check this row: @row on file: @file",array('@sales_invoice'=>$data[1],'@row'=>$row,'@file'=>INBOUND_2GO_PREFIX.$date.".csv"),WATCHDOG_ERROR);	
+						}
+				}
+				$row++;
+			}
+			fclose($handle);
+			/*
+			$message_email = '2GO AWB template was successfully uploaded to the FTP folder.';
+			*/
+			
+    	}else{
+			watchdog("cron","No 2GO Transaction Found",array(),WATCHDOG_NOTICE);
+			return false;
+		}
+		
+
+}
+
+function tracking_2go_generate($sales_invoice,$awb,$status_number=0){
+	$si_id = ltrim(str_replace(SACI_PREFIX,"",$sales_invoice), '0');
+	$order_id_main = db_query("SELECT order_id FROM {checkout_vat_inc} WHERE id = :id", array(':id' => $si_id))->fetchField();
+	if($order_id_main){
+		$deliverystatus = array("for_delivery","delivered","in_transit","unknown_consignee","bad_address","refused_to_accept","hold_cargo","business_close","return_to_sender","consignee_not_around");
+		$order = uc_order_load($order_id_main);
+		$tracking_number = db_query("SELECT tracking_number FROM {uc_shipments} WHERE order_id = :id", array(':id' => $order_id_main))->fetchField();
+		if(empty($tracking_number))
+			awb_number_2go($order_id_main,$awb);
+		$order->order_status = $deliverystatus[$status_number];
+		uc_order_save($order);
+		$order_status = db_query("SELECT title FROM {uc_order_statuses} WHERE order_status_id = :status", array(':status' => $deliverystatus[$status_number]))->fetchField();
+		watchdog("cron","SALES INVOICE: @sales_invoice has changed Delivery Status to: @order_status",array('@sales_invoice'=>$sales_invoice,'@order_status'=>$order_status),WATCHDOG_NOTICE);
+	}else{
+		watchdog("cron","SALES INVOICE : @sales_invoice is Invalid/Not Exist",array('@sales_invoice'=>$sales_invoice),WATCHDOG_ERROR);
+	}
+		
+	
+}
+
+function awb_number_2go($order_id_main,$awb){
+	$order = uc_order_load($order_id_main);
+	$package_id = db_query("SELECT package_id FROM {uc_packages} WHERE order_id = :id", array(':id' => $order_id_main))->fetchField();
+	if(!$package_id){
+		$package = array();
+		foreach ($order->products as $id=>$product) {
+			$package['products'][$id] = $product;
+			if ($product->data['shippable']) {
+				$package['shipping_type'] = uc_product_get_shipping_type($product);
+			}
+		}
+		$package['tracking_number'] = $awb;
+		$package['order_id'] = $order->order_id;
+		uc_shipping_package_save($package);	
+		$package_id = db_query("SELECT package_id FROM {uc_packages} WHERE order_id = :id", array(':id' => $order_id_main))->fetchField();	
+	}
+	$packageSubmit = uc_shipping_package_load($package_id);
+	$address = $packageSubmit->addresses[0];
+	$origin = new stdClass();
+	$origin->phone = $address->phone;
+	$origin->first_name = $address->phone;
+	$origin->last_name = $address->last_name;
+	$origin->company = $address->company;
+	$origin->street1 = $address->street1;
+	$origin->street2 = $address->street2;
+	$origin->city = $address->city;
+	$origin->zone = $address->zone;
+	$origin->country = $address->country;
+	$origin->postal_code = $address->postal_code;
+	$origin->email = uc_store_email();
+    
+	$destination = new stdClass();
+	$destination->phone = $order->delivery_phone;
+	$destination->first_name = $order->delivery_first_name;
+	$destination->last_name = $order->delivery_last_name;
+	$destination->company = $order->delivery_company;
+	$destination->street1 = $order->delivery_street1;
+	$destination->street2 = $order->delivery_street2;
+	$destination->city = $order->delivery_city;
+	$destination->zone = $order->delivery_zone;
+	$destination->country = $order->delivery_country;
+	$destination->postal_code = $order->delivery_postal_code;
+	$destination->email = $order->primary_email;
+	$destination->order_comment = uc_order_comments_load($order_id);
+	if (empty($destination->company)) {
+		$destination->company = $destination->first_name . ' ' . $destination->last_name;
+	}
+	$destination->zone_name = uc_zone_get_by_id($destination->zone);
+	$destination->country_name = uc_country_get_by_id($destination->country);
+	
+	foreach ($packageSubmit->products as $product) {
+		$declared_value += $product->qty * $product->price;
+	}
+	
+	$package['order_id'] = $order->order_id;
+
+	$package               = clone $packageSubmit;
+    $package->pkg_type     = $packageSubmit->shipping_type;
+    $package->value        = $declared_value;
+    $package->weight       = isset($packageSubmit->weight) ? $packageSubmit->weight : 1; //hack to allow sending even if no weight
+    $package->weight_units = isset($packageSubmit->weight_units) ? $packageSubmit->weight_units : variable_get('uc_weight_unit', 'kg');
+    $package->length       = isset($packageSubmit->length) ? $packageSubmit->length : 0;
+    $package->width        = isset($packageSubmit->width) ? $packageSubmit->width : 0;
+    $package->height       = isset($packageSubmit->height) ? $packageSubmit->height : 0;
+    $package->length_units = isset($packageSubmit->length_units) ? $packageSubmit->length_units :variable_get('uc_length_unit', 'cm');
+	$package->export_purpose 	= variable_get('uc_xend_PurposeOfExportType', 'None');
+	$package->paid = $order->quote['rate'];
+	
+	$shipment = new stdClass();
+	$shipment->order_id = $order->order_id;
+	$shipment->origin = $origin;
+	$shipment->destination = $destination;
+	$shipment->packages = $xend_package['packages'];
+	$shipment->shipping_method = '2GO';
+	$shipment->accessorials = $package->pkg_type;
+	$shipment->carrier = t('2GO');
+	$shipment->tracking_number = $awb;
+	uc_shipping_shipment_save($shipment);
+	return true;	
+}
+
+
+
+/*
+	STOCK ALLOCATION EXPIRE
+
+*/
+
+function cron_expire_stock(){
+		$strtotime = strtotime("now");
+		$query = db_select('uc_stock_allocation', 'usa')
+		->fields('usa',array('order_id'))
+		->groupBy('usa.order_id')
+		->condition('usa.exp_time',$strtotime,'<')
+		->execute();
+		if($query->rowCount()>0):
+			
+			 while($record = $query->fetchAssoc()) {
+				$order = uc_order_load($record['order_id']);
+				foreach($order->products as $key => $value):
+			 		stock_update_inventory("expire",$value->model,$value->qty);
+				endforeach;
+				db_delete('uc_stock_allocation')->condition('order_id', $record['order_id'])->execute();
+				/*
+					BDO TRANSCATION
+				*/
+				if($order->payment_method == "sandcart_payment"){
+					$order->order_status = "expired";
+					uc_order_save($order);
+				}
+    		  }
+		endif;
+}
+
+
+/*
+	HOOKS CONTENT TYPE SHIPPING
+*/
+
+function page_cron_bdo(){
+	bdo_checker(date("mdY",strtotime("-1 day")));
+}
+
+function bdo_checker($date=""){
+		$filename = MMS_FILE_PATH_ROOT."/".variable_get('folder_bdo','bdo/').BDO_PREFIX.$date.".csv";
+		if (($handle = fopen($filename, 'r')) !== FALSE){
+			$row = 1;
+			while (($data = fgetcsv($handle, 0, ",")) !== FALSE) {
+				if($row>=7 && $data[4]!="TOTAL")
+						print cdv_ready($data[12]);
+						//print_r($data[12]);
+				$row++;
+			}
+			fclose($handle);
+			$message_email = 'BDO Remittance csv file was successfully uploaded.';
+    	}else{
+			watchdog("cron","No BDO Transaction Found",array(),WATCHDOG_NOTICE);
+			$message_email = 'No BDO Remittance csv file received today.';
+		}
+		$email = EMAIL_BDO_TO;
+		$module = 'shipping_accomodation';
+		$key = 'key';
+		$language = language_default();
+		$params['headers']['Cc'] = EMAIL_BDO_CC;
+		$from = null;
+		$send = FALSE;
+		$message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+		//$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+		$message['from'] =  "SM Appliance Center no-reply@smappliance.com";
+		$message['subject'] = "BDO Remittance CSV File";
+		$message['body'] = array();
+		$message['body'][] = 'Hi,';
+		$message['body'][] = '';
+		$message['body'][] = $message_email;
+		$message['body'][] = '';
+		$message['body'][] = '-SM Appliance e-Store';	
+		// Retrieve the responsible implementation for this message.
+		$system = drupal_mail_system($module, $key);
+		// Format the message body.
+		$message = $system->format($message);
+		// Send e-mail.
+		if($system->mail($message))
+			return "Successful Sent Email";
+		else
+			return "Unuccessful Sent Email";
+		
+}
+
+function cdv_ready($cdv){
+	global $user;
+    $query = db_select("sandcart_payment_bdo","spo")
+	->fields('spo',array('order_id','bdo_smac'))
+	->condition('spo.bdo_cdv',$cdv)
+	->execute();
+	if($query->rowCount()>0){
+		$object_fetch = $query->fetchObject();
+		$order_id_bdo = $object_fetch->order_id;
+		$query_invoice = db_query("SELECT id FROM checkout_vat_inc WHERE order_id = :oid",array(':oid'=>$order_id_bdo));
+		if($query_invoice->rowCount()==0){
+			$order = uc_order_load($order_id_bdo);
+			$userfetch = user_load($order->uid);
+    		$tin = (isset($userfetch->field_tin['und']['0']['value']))?$userfetch->field_tin['und']['0']['value']:'---';
+    		$smacnumber = ($object_fetch->bdo_smac>0)?$object_fetch->bdo_smac:0;
+			$order_checkout= db_insert('checkout_vat_inc')
+          		->fields(array(
+					'order_id' => $order->order_id,
+					'total_sale' => number_format($order->order_total, 2, '.', ''),
+					'vatable_sale' => number_format(($order->order_total / 1.12), 2, '.', ''),
+					'vat_amt' => number_format(($order->order_total - ($order->order_total / 1.12)), 2, '.', ''),
+					'smac_no' => $smacnumber,
+					'payment_method' => 'BDO',
+					'tin'=>$tin
+          		))
+			->execute();
+			$order->order_status = "payment_received";
+			$order->field_complete_time['und'][0]['value'] = strtotime("now");
+			uc_order_save($order);
+			if($order_checkout){
+				$params = array('order' => $order,'oid' => $order->order_id);
+				drupal_mail(
+					'custom_login', 
+					'bdo-invoice', 
+					$userfetch->mail, 
+					language_default(), 
+					$params,
+					uc_store_email_from()
+				);		
+			}
+			stock_allocation_validate("complete",$order_id_bdo);	
+		}
+	}
+}
+
+function stock_checker_notifaction_gateway($order_id){
+	$status = true;
+	$order = uc_order_load($order_id);
+	foreach($order->products as $key => $value):
+			if(uc_stock_level($value->model)==0 || $value->qty > uc_stock_level($value->model)){
+				$notification[] = $value->title;
+				$status = false;
+			}	
+	endforeach;
+	if($status == false){
+		$mess1 = "Oops sorry! But the last piece";
+		$mess2 = "has already been purchased by a couple of minutes ago, kindly watch out for arrival of new stocks.";
+		foreach($notification as $product){
+			$message = $mess1.' ' . $product . ' ' . $mess2;
+			drupal_set_message($message, $type="error");
+		}
+		$return['triger_notif'] = "cart";
+		$return['status'] = false;	
+	}else{
+		$return['status'] = true;	
+	}
+	return $return;
+}
+
+
+function stock_checker_notifaction(){
+	if(isset($_REQUEST['qty']) && isset($_REQUEST['index'])){
+		$index_number = 0;
+		$order_detail = uc_cart_get_contents();	
+		foreach($order_detail as $key => $value_detail):
+				if($index_number == $_REQUEST['index']){
+					if($_REQUEST['qty'] > uc_stock_level($value_detail->model)){
+						$array = array("status"=>false,"item_name"=>trim($value_detail->title),"item_qty"=>uc_stock_level($value_detail->model),"cart_id"=>$key);
+					}else{
+						$array['status'] = true;					
+					}
+				}
+				$index_number++;
+		endforeach;
+	}else{
+		$array['status'] = true;	
+	}
+	echo json_encode($array);	
+}
+
+
+
+function stock_allocation_summary(){
+		$status = true;
+		$cartitems = uc_cart_get_contents();
+		foreach($cartitems as $key => $value):
+			$active_qty = uc_stock_level($value->model);
+			if($active_qty==0 || $value->qty > $active_qty)
+				$status = false;
+		endforeach;
+		$return['status'] = ($status == false)?false:true;
+	echo json_encode($return);	
+}
+
+
+function intentory_checker($order_array){
+		$status = TRUE;
+		$inventory = array();
+		foreach($order_array as $key => $value){
+			$initial_stock = db_select("uc_product_stock","ups")->fields("ups",array("stock"))->condition("ups.sku",$value->model)->execute()->fetchfield();
+			if($initial_stock<$value->qty){
+				$inventory[] = $value->title;	
+				$status = FALSE;
+			}
+			
+		}
+		if($status==FALSE){
+			$array = array("status"=>FALSE,"list_of_items"=>$inventory);
+		}else{
+			$array = array("status"=>TRUE);
+		}
+		return $array;
+}
+
+/*	table: uc_stock_allocation
+	field:
+		- stock_id
+		- order_id
+		- sku				
+		- qty
+		- start_time				
+		- exp_time
+		- status 0 = credit card, 1 = BDO
+*/
+
+function stock_allocation_validate($case,$order_id){
+	$zero_notication = array();
+	switch($case){
+		case "pending_bdo":
+		case "pending_creditcard":
+			$expire_time = ($case=="pending_bdo")?strtotime("+7 days"):strtotime("+1 hour");
+			$query = db_select("uc_stock_allocation","usa")
+			->fields("usa",array('stock_id'))
+			->condition("usa.order_id",$order_id)
+			->execute();
+			if($query->rowCount()==0):
+				$order = uc_order_load($order_id);
+				foreach($order->products as $key => $value):
+			 		$nodeinsert = db_insert('uc_stock_allocation') // Table name no longer needs {}
+						->fields(array(
+							'order_id' => $order_id,
+							'sku' => $value->model,
+							'qty' => $value->qty,
+							'start_time' => strtotime("now"),
+							'exp_time' => $expire_time,
+							'status' => 1,
+						))
+					->execute();
+					$trigger = stock_update_inventory("stock_allocate",$value->model,$value->qty);
+					   if($trigger['status']==true)
+						  $zero_notication[$value->model] = $trigger['stock'];
+				endforeach;
+				return  notification_email_trigger($zero_notication);
+			else:
+				return FALSE;
+			endif;
+		break;	
+		case "failed":
+			$query = db_select("uc_stock_allocation","usa")
+			->fields("usa",array('stock_id'))
+			->condition("usa.order_id",$order_id)
+			->execute();
+			if($query->rowCount()>0):
+				$order = uc_order_load($order_id);
+				foreach($order->products as $key => $value):
+			 		stock_update_inventory("expire",$value->model,$value->qty);
+				endforeach;
+				db_delete('uc_stock_allocation')->condition('order_id', $order_id)->execute();			
+				return TRUE;
+			else:
+				return FALSE;
+			endif;
+		break;	
+		case "complete":
+			$query = db_select("uc_stock_allocation","usa")
+			->fields("usa",array('stock_id'))
+			->condition("usa.order_id",$order_id)
+			->execute();
+			if($query->rowCount()>0):
+				$order = uc_order_load($order_id);
+				foreach($order->products as $key => $value):
+			 		/*
+						$trigger = stock_update_inventory("complete",$value->model,$value->qty);
+						if($trigger['status']==true)
+							$zero_notication[$value->model] = $trigger['stock'];
+					*/	
+					stock_update_inventory("complete",$value->model,$value->qty);
+					
+				endforeach;
+				
+				db_delete('uc_stock_allocation')->condition('order_id', $order_id)->execute();			
+				return TRUE;
+			else:
+				return FALSE;
+			endif;
+		break;	
+	}
+	
+}
+
+function notification_email_trigger($zero_notication){
+	if(count($zero_notication)>0){
+		$body_include = '';
+		$to = variable_get('stock_notification_to', 'jyc@mci.com.ph,p.ferrer@spinweb.ph,ecd@mci.com.ph,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com,ferrer_princesse@yahoo.com');
+		//$to = "e.quilala@spinweb.ph,p.ferrer@spinweb.ph";
+		$recipient = "elmermartin.quilala@gmail.com";
+		$body = 'This is to inform you that stocks for the following SKUs have reached their threshold.<br />Please see list below: <br /><br />';
+		$body .= '<table border="1" cellpadding="2" style="width: 300px;"><tr><th scope="col">SKU</th><th scope="col">Stock Quantity</th></tr>';
+		foreach($zero_notication as $sku => $qty)
+			$body .= '<tr><td>'.$sku.'</td><td>'.$qty.'</td></tr>';
+		$body .= '</table><br />';
+		$body .= 'Thank you!';
+		$xsubject = 'SM Appliance Center: Stock threshold limit reached';
+		$params = array('body' => $body, 'subject' => $xsubject);
+		drupal_mail('custom_login', 'thres', $to, language_default(), $params, uc_store_email_from());
+	}else
+		return false;
+}
+
+function stock_update_inventory($case,$model,$order_quantity){
+	$stock_zero_trigger = false;
+	$stockinfo = db_select("uc_product_stock","ups")->fields("ups",array("stock","allocated","threshold"))->condition("ups.sku",$model)->execute()->fetchObject();
+	switch($case){
+			case "stock_allocate":
+				$stock = $stockinfo->stock-$order_quantity;
+				$allocate = $stockinfo->allocated+$order_quantity;
+				$message = "Stock Allocated Add to threshold ";
+			break;
+			case "expire":
+				$stock = $stockinfo->stock+$order_quantity;
+				$allocate = $stockinfo->allocated-$order_quantity;
+				$message = "Expire/Incomplete Transaction Back to live stock ";
+			break;
+			case "complete":
+				$stock = $stockinfo->stock;
+				$allocate = $stockinfo->allocated-$order_quantity;
+				$message = "";
+				
+			break;
+	}
+	if($stock <= $stockinfo->threshold)
+		$stock_zero_trigger = array("status"=>true,"stock"=>$stock);
+	
+	if($message!=""){
+		watchdog("cron","@message on sku: @skugenerate qty: @qty",array("@message"=>$message,"@skugenerate"=>$model,"@qty"=>$order_quantity),WATCHDOG_NOTICE);
+	}
+	$update_stock = db_update("uc_product_stock")
+					->fields(array('stock' => $stock,'allocated'=>$allocate))
+					->condition('sku', $model)
+					->execute();
+	
+	return $stock_zero_trigger;				
+	
+}
+
+
+
+function portal_page(){
+	global $user;
+	$html = "";
+	if(!empty($user->roles[4]) || !empty($user->roles[14])){
+    	$html .= '
+		<div class="portal-container" style="margin-top: 0;">
+			<h2>Administrator Dashboard</h2>
+			<ul>
+				<li><a href="/user-list"><img src="/sites/default/files/SACI_User-Role.png" /><br />User Role Management</a></li>
+				<li><a href="/dashboard/configuration_settings"><img src="/sites/default/files/SACI_Site-Statistics.png" /><br />Admin Settings</a></li>
+				<li><a href="/admin/structure/block/manage/block/14/configure?destination=dashboard"><img src="/sites/default/files/SACI_Site-Statistics.png" /><br />Text Block for Checkout</a></li>
+				<li><a href="/admin/structure/block/manage/block/10/configure?destination=dashboard"><img src="/sites/default/files/SACI_Site-Statistics.png" /><br />Text Block for Registration</a></li>
+			</ul>
+			<ul>
+					<li><a href="/node/add/product"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Create Product</a></li>
+					<li><a href="/node/201/edit?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit About SM Appliance</a></li>
+					<li><a href="/node/204/edit?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Privacy Policy</a></li>
+					<li><a href="/node/224/edit?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Exchange, Cancellation and Shipping Policies</a></li>
+			</ul>
+			<ul>
+					<li><a href="/dashboard/edit-terms-and-condition"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Terms and Condition</a></li>
+					<li><a href="/admin/structure/block/manage/block/22/configure?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Block on Visa</a></li>
+					<li><a href="/admin/structure/block/manage/block/21/configure?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Block on Mastercard</a></li>
+					<li><a href="/node/9000/edit?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit FAQ</a></li>
+					
+			</ul>
+				
+		</div>
+		';
+	}
+	if(!empty($user->roles[4]) || !empty($user->roles[14]) || !empty($user->roles[10])){
+		$html .= '
+		<div class="portal-container">
+			<h2>Accounting Dashboard</h2>
+			<ul>
+				<li><a href="/bir-report"><img src="/sites/default/files/SACI_BIR-report.png" /></a></li>
+				<li><a href="/outbound-report"><img src="/sites/default/files/SACI_Outbound-report.png" /></a></li>	
+			</ul>
+		</div>';
+	}
+	if(!empty($user->roles[4]) || !empty($user->roles[14]) || !empty($user->roles[12])){
+		$html .= '
+			<div class="portal-container">
+				<h2>Contact Center & Operations Dashboard</h2>
+				<ul>
+					<li><a href="/admin/store/orders/view"><img src="/sites/default/files/SACI_Transaction-Details.png" /><br />Transaction Details</a></li>
+					<li><a href="/dashboard/member_profile"><img src="/sites/default/files/SACI_Members-Profile.png" /><br />Member\'s Profile</a></li>
+					<li><a href="/transmittal-slip-and-packing-list-report"><img 
+					src="/sites/default/files/SACI_Transmittal.png" /><br />Transmittal Slip and Packing List Report</a></li>
+					<li><a href="/dashboard/2go/export"><img 
+					src="/sites/default/files/SACI_Transmittal.png" /><br />2go Outbound</a></li>
+					
+				</ul>
+				<ul>
+					<li><a href="/dashboard/shipping_rate"><img src="/sites/default/files/SACI_SKU-Checker.png" /><br />Shipping Rate</a></li>
+					<li><a href="/dashboard/location/servicable"><img src="/sites/default/files/SACI_SKU-Checker.png" /><br />Shipping Location</a></li>
+				</ul>
+			</div>';
+	}
+	if(!empty($user->roles[4]) || !empty($user->roles[14]) || !empty($user->roles[11])){
+		$html .= '
+			<div class="portal-container">
+				<h2>Sales & Merchandising Dashboard</h2>
+				<ul>
+					<li><a href="/admin/store/reports/sales/dashboard/sales-report"><img src="/sites/default/files/SACI_Sales-Report.png" /><br />Sales Report</a></li>
+		<li><a href="/admin/store/reports/sales/dashboard/inventory"><img src="/sites/default/files/SACI_Sales-and-Inventory.png" /><br />Sales & Inventory</a></li>
+					<li><a href="/sku-scheduler"><img src="/sites/default/files/SACI_SKU-Scheduler.png" /><br />SKU Scheduler</a></li>
+					<li><a href="/sku-checker"><img src="/sites/default/files/SACI_SKU-Checker.png" /><br />SKU Checker</a></li>
+				</ul>
+				<h3><img src="/sites/default/files/SACI_Catalogue-Management.png" /></h3>
+				<ul>
+					<li><a href="/product-item-management"><img src="/sites/default/files/SACI_Product-Management.png" /><br />Product Management</a></li>
+					<li><a href="/admin/structure/taxonomy/all_appliances/list"><img src="/sites/default/files/SACI_Category-Management.png" /><br />Category Management</a></li>
+					<li><a href="/admin/store/reports/stock?sort=desc&order=SKU"><img src="/sites/default/files/SACI_Stock-management.png" /><br />Stock Management</a></li>
+				</ul>
+				
+			</div>
+		';
+	}
+	if(!empty($user->roles[4]) || !empty($user->roles[14]) || !empty($user->roles[13])){
+		$html .= '
+			<div class="portal-container">
+				<h2>Marketing Dashboard</h2>
+				<ul><li><a href="/sites-statistics"><img src="/sites/default/files/SACI_Site-Statistics.png" /><br />Site Statistics</a></li><li><a href="/dashboard/slide_show_banner"><img src="/sites/default/files/SACI_Site-Statistics.png" /><br />Front Page Banner</a></li></ul>
+			</div>
+			
+		';	
+	}
+	return $html;
+}
+
+function shipping_accomodation_mail($key, &$message, $params) {
+	switch($key){
+		case "notification":
+			$message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+			$message['from'] = uc_store_email_from();
+			$message['subject'] = t("SM Appliance Center: Stock threshold limit reached");
+      		$message['body'][] = t(
+			'
+				<p>This is to inform you that stocks for the following SKUs have reached their threshold.<br />Please see list below: <br /><br /></p>
+				<table style="width:300px;" border="1" align="left">
+				<tr>
+					<th style="width:50%;">SKU</th>
+					<th style="width:50%;">QTY</th>
+				</tr>
+				!bodyhtml
+				</table><br />
+				<table style="width:100%;margin-top:15px;" border="0" align="left">
+				<tr>
+					<td>Thank you!</td>
+				</tr>
+				</table>
+				',$params);
+		break;
+	}
+}

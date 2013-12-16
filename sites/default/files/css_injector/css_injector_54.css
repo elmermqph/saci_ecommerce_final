@@ -1,0 +1,47 @@
+.portal-container{
+width: 541px;
+border-right: 1px solid #CCC;
+border-left: 1px solid #CCC;
+border-bottom: 1px solid #CCC;
+float: left;
+background: #E4E4E2;
+padding: 0px 0px 15px;
+min-height: 107px;
+margin-top: -16px;
+-moz-border-radius: 0px 0px 20px 20px;
+border-radius: 0px 0px 20px 20px;
+clear: both;
+}
+.portal-container h2 {
+color: white;
+font-size: 14px;
+background: url("/sites/default/files/SACI_Admin-Dashboard.png") no-repeat;
+
+text-align: center;
+padding: 3px 0px;
+margin: 0px 0px 10px;
+}
+.portal-container ul ,
+.portal-container h3{
+margin-left:20px;
+}
+.portal-container h3{
+clear:both;
+}
+
+.portal-container ul {
+display:inline;
+list-style:none;
+float:left;
+}
+.portal-container ul li{
+float: left;
+width: 126px;
+text-align: center;
+}
+.portal-container ul li a{
+color:#1f1f1f;
+}
+.portal-container ul li a:hover{
+text-decoration:none;
+}

@@ -1,0 +1,28 @@
+/*------------------------------------------*/
+/*
+Spinweb Production Inc. 
+CSS standard style for Drupal Fusion Theme
+Authored by: Elmer Martin M. Quilala
+Date:March 29, 2011
+*/
+/*------------------------------------------*/
+/*body{  font-family: 'Cabin', lucida grande, arial, sans-serif;color:#333333;}*/
+body{font-family: "Lucida Grande",Arial,sans-serif; color:#333333;}
+
+/*Node*/
+h1.title{font-size:24px;font-weight:bold;line-height:24px;}
+.node h2{font-size:24px;}
+.node h2{font-size:18px;}
+.node p{font-size:13px !important;line-height:1.3em;}
+.node a{font-size:12px;color:#cc0000;text-decoration:none;}
+.node a:hover{text-decoration:underline;}
+/*Block*/
+h2.block-title{font-size:18px;letter-spacing:-1px;}
+.block label{font-size:12px;font-weight:bold;}
+.block p{font-size:12px;}
+.block a{font-size:12px;color:#3CB3F8;text-decoration:none;}
+.block a:hover{text-decoration:underline;}
+
+
+
+/*------------------------------------------*/

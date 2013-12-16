@@ -1,0 +1,197 @@
+h1.title{
+display:none;
+}
+#block-views-general_info_product-block{
+float:right;
+}
+
+.content-region-inner .node-product.contextual-links-region{
+clear:both;
+}
+#content {
+position: relative;
+}
+#block-views-general_info_product-block{
+border: 1px solid #CCC;
+ padding: 10px;
+position: absolute;
+right: 0;
+top: 50px;
+}
+#block-views-general_info_product-block .views-field{
+margin-bottom:5px;
+clear: both;
+}
+#block-views-general_info_product-block .views-field-title, #block-views-general_info_product-block .views-field-field-model{
+font-size:14px;
+line-height:16px;
+}
+#block-views-general_info_product-block .views-field-title, #block-views-general_info_product-block .views-field-body span.views-label-body{
+font-weight:bold;
+}
+
+#block-views-general_info_product-block .views-field-field-model{
+ margin-bottom: 10px;
+}
+#block-views-general_info_product-block .views-field span.views-label-field-model{
+float:left;
+padding-right:10px;
+font-size:14px;
+
+}
+
+#block-views-general_info_product-block .views-field-sell-price {
+clear: both;
+margin-bottom: 10px;
+float: left;
+height: 24px;
+}
+
+#block-views-general_info_product-block .views-field-sell-price .discount{
+    width: 154px;
+    float: left;
+    position:relative;
+    font-size: 20px;
+}
+#block-views-general_info_product-block .views-field-sell-price .discount.none{
+    display:none;
+}
+#block-views-general_info_product-block .views-field-sell-price .discount span{
+	text-decoration:line-through;
+}
+#block-views-general_info_product-block .views-field-sell-price .discount .container span{
+text-decoration: line-through;
+font-size: 18px;
+padding-top: 6px;
+float: left;
+
+}
+#block-views-general_info_product-block .views-field-sell-price .discount sup{
+text-decoration: none;
+float: left;
+font-size: 12px;
+padding: 2px 0px 0px 0px;
+}
+
+#block-views-general_info_product-block .views-field-sell-price .discount .container{}
+#block-views-general_info_product-block .views-field-sell-price .mainprice{
+	font-size: 24px;
+        color: #F45D2E;
+        float: left;
+        width: 180px;
+        padding-top: 3px;
+        position:relative;
+}
+#block-views-general_info_product-block .views-field-sell-price .mainprice .container{}
+#block-views-general_info_product-block .views-field-sell-price .mainprice .prefix{
+	text-decoration:line-through;
+}
+
+#block-views-general_info_product-block .views-field-body p{
+margin:0.5em 0px;
+}
+
+#block-views-general_info_product-block .views-field-addtocartlink{
+	width: 50%;
+	float: left;
+}
+#block-views-general_info_product-block .views-field-addtocartlink .node-add-to-cart{
+	background: url('/sites/all/themes/fusion/sm_appliance/images/button_bg_orange.gif') no-repeat;
+	border: 1px solid #999999;
+    color: #FFFFFF;
+    margin: 0px 0;
+    border-radius: 3px 3px 3px 3px;
+    padding: 3px 20px;
+    text-transform: uppercase;
+	font-size:14px;
+	font-weight: normal;
+	
+}
+
+
+#block-views-general_info_product-block .views-field-addtocartlink  .form-actions{
+margin:0px;
+}
+
+#block-views-general_info_product-block .views-field-php-2{
+width: 81px;
+float: left;
+clear: none;
+margin: 4px 0px 0px 0px;
+text-align: right;
+}
+#block-views-general_info_product-block .st_email_large, 
+#block-views-general_info_product-block .st_facebook_large, 
+#block-views-general_info_product-block .st_twitter_large{
+float:left;
+}
+.chrome #block-views-general_info_product-block .views-field-php-2 {
+margin: 2px 0px 0px 0px;	
+}
+#block-views-general_info_product-block .views-field-ops{
+display:none;
+}
+#block-views-photo_main_product_info-block {
+float:right;
+}
+#block-views-photo_main_product_info-block .viewsSlideshowCycle-processed{
+width: 284px;
+float: left;
+}
+
+#block-views-photo_main_product_info-block .widget_pager_bottom{
+float: right;
+width: 373px;
+}
+#block-views-photo_main_product_info-block .widget_pager_bottom .views-slideshow-pager-field-item{
+float:left;
+padding-right:5px;
+}
+.views-field-uc-product-image ul li{
+list-style-type:none;
+}
+#block-block-16 {clear:both;width:210px;}
+#block-system-main {display:none;}
+
+.product-main-information {
+float: right;
+}
+.product-main-information .view-header{
+display:none;
+}
+.product-main-information h2.title{
+    color: #000000;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing:0px;
+    padding-top: 20px;
+}
+
+.product-main-information .content .views-field{
+padding:5px;
+float: left;
+width: 100%;
+/*
+height: 17px;
+*/
+overflow: hidden;
+}
+.product-main-information .content .views-field.even{
+ background-color: #F1F4F5;
+}
+
+.product-main-information .content .views-field .views-label, .product-main-information .content .views-field .field-content{
+width:330px;
+float:left;
+}
+.product-main-information .content .views-field .field-content p{
+margin:0px;
+}
+#block-views-photo_main_product_info-block img{ margin-left:15px; margin-top: 40px;}
+.view-general-info-product .views-label-field-product-features{font-weight:bold;}
+#stLframe .linkedin{display:none;}
+
+.view-id-general_info_product .views-field-php-2 .field-content span{
+cursor:pointer;
+height:24px;
+}

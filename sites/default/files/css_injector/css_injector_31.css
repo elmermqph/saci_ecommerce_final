@@ -1,0 +1,12 @@
+#webform-component-validation-message{
+background-color: #CCCCCC;
+    margin-right: 59px;
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 400px;
+}
+
+.invalid-1{
+border:2px solid #ff0000;
+}

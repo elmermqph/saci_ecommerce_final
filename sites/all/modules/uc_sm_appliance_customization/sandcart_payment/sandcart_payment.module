@@ -1,0 +1,414 @@
+<?php
+
+/**
+ * Implements hook_permission().
+ */
+function sandcart_payment_permission() {
+  return array(
+    'administer bdo' => array(
+      'title' => t('Administer BDO Instructions'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_mail().
+ */
+function sandcart_payment_mail($key, &$message, $params) {
+	global $base_url;
+	switch($key) {
+		case 'sandcart_payment_bdo':{
+			$message['subject'] = $params['subject'];
+			$message['body'][] = $params['body'];
+			$message['headers']['Content-Type'] = 'text/html; charset=iso-8859-1; format=flowed';
+			break;
+		}
+		case 'sandcart_payment_bdo_complete':{
+			if(!empty($params['order_id'])){
+				$attachment = array(
+					'filecontent' => file_get_contents($base_url . '/bdo/print/' . $params['order_id']),
+					'filename' => 'Order Details.pdf',
+					'filemime' => 'application/pdf',
+				);
+				$message['params']['attachments'][] = $attachment;
+			}
+			$message['subject'] = $params['subject'];
+			$message['body'][] = $params['body'];
+			$message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+			
+			// $message['headers']['Content-Type'] = 'text/html; charset=iso-8859-1; format=flowed';
+			break;
+		}
+	}
+}
+
+
+
+
+function sandcart_payment_menu(){
+	$items['bdo/complete'] = array(
+		'title' => 'Thank you for purchasing at SM Appliance.',
+		'page callback' => 'sandcart_payment_bdo_complete',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+	);
+	$items['bdo/print/%'] = array(
+		'title' => 'Print PDF',
+		'page callback' => 'sandcart_payment_print',
+		'access arguments' => array('access content'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/sandcart.pages.inc',
+	);
+	$items['admin/config/bdo-instruction'] = array(
+		'title' => 'BDO Instruction',
+		'page callback' => 'sandcart_admin_callback',
+		'access arguments' => array('administer bdo'),
+		'file' => 'inc/sandcart_payment_admin.pages.inc',
+	);
+	
+	//sandcart_payment_admin.pages.inc
+	return $items;
+}
+
+function sandcart_payment_uc_payment_method() {
+  $methods[] = array(
+    'id' => 'sandcart_payment',
+    'name' => t('BDO Remittance'), 
+    'title' => t('BDO Remittance'), 
+    'desc' => t('Pay by mailing a check or money order.'), 
+    'callback' => 'sandcart_payment_uc_payment_method_callback', 
+    'weight' => 1, 
+    'checkout' => TRUE,
+    'backend' => TRUE,
+  );
+  return $methods;
+}
+
+function sandcart_payment_uc_payment_method_callback($op, &$order){
+	switch ($op) {
+		case 'settings':{
+			return drupal_get_form('_sandcart_payment_settings');
+		}
+	}
+}
+
+
+/*
+ * Sample Settings Page
+ */
+function _sandcart_payment_settings($form, $form_state){
+	$form['test'] = array(
+		'#title' => t('test title'),
+		'#type' => 'textfield'
+	);
+	return $form;
+}
+
+/**
+ * Implementation of hook_form_FORM_ID_alter().
+ */
+function sandcart_payment_form_uc_cart_checkout_review_form_alter(&$form, &$form_state, $form_id) {
+   
+    if (($order_id = intval($_SESSION['cart_order'])) > 0) {
+        $order = uc_order_load($order_id);
+        if ($order->payment_method == 'sandcart_payment') {
+           
+		    unset($form['actions']['submit']);
+      		$form['actions']['hsbc_migs_submit'] = drupal_get_form('sandcart_payment_form', $order);
+			/*
+				$form['order_id'] = array("#type" => 'hidden',"#value" => $order->order_id);           
+			   
+				unset($form['actions']['submit']);
+				$form['actions']['submit'] = array(
+					'#type' => 'submit',
+					'#value' => t('Submit Order'),
+				);
+				$form['#submit'][] = 'sandcart_payment_form_submit';
+		   	*/
+            
+        }
+    }
+}
+function sandcart_payment_form($form, &$form_state, $order){
+		$form['order_id'] = array("#type" => 'hidden',"#value" => $order->order_id);
+		$form['submit'] = array(
+    		'#type' => 'submit',
+    		'#value' => t('Submit Order'),
+  		);
+		return $form;
+}	
+
+function sandcart_payment_form_submit($form, &$form_state){
+   	stock_allocation_validate("pending_bdo",$form_state['values']['order_id']);
+    $order = uc_order_load($form_state['values']['order_id']);
+    $order->order_status = "pending";
+    uc_order_save($order);
+	$qry = "SELECT MAX(sequence) FROM sandcart_payment_seq WHERE sandcart_date = :sandcart_date";
+    $topad = db_query($qry,array(":sandcart_date" => date("md")))->fetchField();
+    if(empty($topad)){
+        $topad = 1;
+    }else{
+        $topad += 1;
+    }
+   
+    $branch = "423";
+    $seq_val = str_pad($topad,4,0,STR_PAD_LEFT);
+    $cREF =  str_pad(str_replace(".","",number_format($order->order_total, 2, '', '')),8,0,STR_PAD_LEFT);
+    $cREF = $branch.$seq_val.date("md").$cREF;
+
+    $str = str_split($cREF);
+    $count = count($str);
+    $result = 0;
+    $ctr = 1;
+    $ccd = 0;
+   
+    for($i=1;$i <= $count; $i++){
+        // echo $result . ' ' . $str[$i-1] . ' ' . $ctr . "\n";
+        $result = $result + ($str[$i-1] * $ctr);
+        $ctr += 1;
+        if($ctr > 10){
+            $ctr = 2;
+        }
+    }
+   
+    $bdo_smac = !empty($_SESSION['test-card']) ? $_SESSION['test-card'] : 0;
+   
+    $ccd = $result % 10;
+    $insert_bdo_transaction = db_insert('sandcart_payment_bdo')
+                    ->fields(array(
+                        'order_id' => $order->order_id,
+                        'bdo_date' => time(),
+                        'bdo_cdv' => $cREF.$ccd,
+                        'bdo_smac' => $bdo_smac,
+                    ))
+                    ->execute();
+   
+    $insert_bdo_seq = db_insert('sandcart_payment_seq')
+                    ->fields(array(
+                        'sandcart_date' => date('md'),
+                        'sequence' => $topad,
+                        'order_id' => $order->order_id,
+                    ))->execute();
+   
+   
+    $order_ref = array(
+        'order-ref' => $cREF.$ccd,
+        'order-id' => $order->order_id,
+        'tDate' => time(),
+        'order-total' => $order->order_total
+    );
+   
+    $form_state['redirect'] = array(
+        'bdo/complete',
+        array('query' => $order_ref),
+    );
+}
+
+
+function sandcart_payment_bdo_complete($cart_id = 0){
+	$order_ref = isset($_GET['order-ref']) ? $_GET['order-ref'] : '';
+	$order_id = isset($_GET['order-id']) ? $_GET['order-id'] : '';
+	$order_date = isset($_GET['tDate']) ? $_GET['tDate'] : '';
+	$order_total = isset($_GET['order-total']) ? $_GET['order-total'] : '';
+	
+	$xorder = uc_order_load($_SESSION['cart_order']);
+	
+	drupal_add_css(drupal_get_path('module', 'uc_cart') . '/uc_cart.css');
+	drupal_add_css(drupal_get_path('module', 'sandcart_payment') . '/css/bdo_complete.css');
+	drupal_set_title("Thank you for purchasing at SM Appliance.");
+	
+	$NewDate = date('F d, Y', strtotime(date('Y-m-d, Y',$order_date) . "+ 7 days"));
+	$time = date('g:i A');
+	
+	$output = '';
+	$output = "<span class='kindly' style='line-height: 15px; font-size: 10px'><p style='margin: 0;'>Kindly print and present this Order Summary at any BDO Remit office or remittance partner offering Kabayan Bills Bayad.</p>";
+	$output .= "<p style='margin: 0;'>You have until <strong>".$NewDate." 10:00pm (Philippine Time)</strong> to pay for your Order through BDO Remittance Centers</p></span> <br />";
+	$panes = $_SESSION['ubercart']['panes'];
+	$output .= '<table width="100%" class="order-review-table" style="border: 1px solid #999999;font-size: 0.9em;line-height: 1.4em;margin: auto;font-size: 0.9em;line-height: 1.4em;color: #333333; font-size:10px;">';
+	foreach ($panes as $title => $data) {
+		
+	  
+    $output .= '<tr class="pane-title-row" style="background-color: #ddd;border: solid 1px #999;font-weight: bold;padding: .5em 1em;text-align: center;">';
+	
+	if($title != 'Cart contents'){
+		if($title == "Billing information"){
+			$output .= '<td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . ucwords($title) . '</td>';
+			$output .= '</tr>';
+			$output .= '<tr>';
+			$output .= '<td class="title-col" style="padding-bottom: 0.2em;padding-top: 0.1em;font-weight: bold;padding-left: 3em;text-align: right;white-space: nowrap; font-size: 10px;">Name:</td>';
+			$output .= '<td class="data-col" style="padding-bottom: 0.2em;padding-top: 0.1em; padding-right: 3em; font-size: 10px;"><strong>' . $xorder->billing_first_name .' ' . $xorder->billing_last_name . '</strong></td>';
+			$output .= '</tr>';
+			if (is_array($data)) {
+			  foreach ($data as $row) {
+				if (is_array($row)) {
+				  if (isset($row['border'])) {
+					$border = ' class="row-border-' . $row['border'] . '"';
+				  }
+				  else {
+					$border = '';
+				  }
+				  $output .= '<tr' . $border . '>';
+				  $output .= '<td class="title-col" style="padding-bottom: 0.2em;padding-top: 0.1em;font-weight: bold;padding-left: 3em;text-align: right;white-space: nowrap; font-size: 10px;">' . $row['title'] . ':</td>';
+				  $output .= '<td class="data-col" style="padding-bottom: 0.2em;padding-top: 0.1em; padding-right: 3em; font-size: 10px;">' . $row['data'] . '</td>';
+				  $output .= '</tr>';
+				}
+				else {
+				  $output .= '<tr><td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . $row . '</td></tr>';
+				}
+			  }
+			}
+			else {
+			  $output .= '<tr><td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . $data . '</td></tr>';
+			}
+		}else{
+			if($title == "Delivery information"){
+				$output .= '<td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . ucwords($title) . '</td>';
+				$output .= '</tr>';
+				$output .= '<tr>';
+				$output .= '<td class="title-col" style="padding-bottom: 0.2em;padding-top: 0.1em;font-weight: bold;padding-left: 3em;text-align: right;white-space: nowrap; font-size: 10px;">Name:</td>';
+				$output .= '<td class="data-col" style="padding-bottom: 0.2em;padding-top: 0.1em; padding-right: 3em; font-size: 10px;"><strong>' . $xorder->delivery_first_name .' ' . $xorder->delivery_last_name . '</strong></td>';
+				$output .= '</tr>';
+				if (is_array($data)) {
+				  foreach ($data as $row) {
+					if (is_array($row)) {
+					  if (isset($row['border'])) {
+						$border = ' class="row-border-' . $row['border'] . '"';
+					  }
+					  else {
+						$border = '';
+					  }
+					  $output .= '<tr' . $border . '>';
+					  $output .= '<td class="title-col" style="padding-bottom: 0.2em;padding-top: 0.1em;font-weight: bold;padding-left: 3em;text-align: right;white-space: nowrap; font-size: 10px;">' . $row['title'] . ':</td>';
+					  $output .= '<td class="data-col" style="padding-bottom: 0.2em;padding-top: 0.1em; padding-right: 3em; font-size: 10px;">' . $row['data'] . '</td>';
+					  $output .= '</tr>';
+					}
+					else {
+					  $output .= '<tr><td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . $row . '</td></tr>';
+					}
+				  }
+				}
+				else {
+				  $output .= '<tr><td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . $data . '</td></tr>';
+				}
+			}else{
+				
+				if($title == "Calculate shipping cost"){
+					$output .= '<td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">Shipping Cost</td>';
+				}else{
+					$output .= '<td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . ucwords($title) . '</td>';
+				}
+
+				$output .= '</tr>';
+				if($title == 'Order Summary'){
+					$output .= '<tr><td class="title-col" style="padding-bottom: 0.2em;padding-top: 0.1em;font-weight: bold;padding-left: 3em;text-align: right;white-space: nowrap; font-size: 10px;">Order Reference Number:</td><td class="data-col" style="padding-bottom: 0.2em;padding-top: 0.1em; padding-right: 3em; font-size: 10px;">'.$order_ref.'</td><td></td></tr>';
+				}
+				if (is_array($data)) {
+				  foreach ($data as $row) {
+					if (is_array($row)) {
+					  if (isset($row['border'])) {
+						$border = ' class="row-border-' . $row['border'] . '"';
+					  }
+					  else {
+						$border = '';
+					  }
+					  $output .= '<tr' . $border . '>';
+					  $output .= '<td class="title-col" style="padding-bottom: 0.2em;padding-top: 0.1em;font-weight: bold;padding-left: 3em;text-align: right;white-space: nowrap; font-size: 10px;">' . $row['title'] . ':</td>';
+					  $output .= '<td class="data-col" style="padding-bottom: 0.2em;padding-top: 0.1em; padding-right: 3em; font-size: 10px;">' . $row['data'] . '</td>';
+					  $output .= '</tr>';
+					}
+					else {
+					  $output .= '<tr><td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . $row . '</td></tr>';
+					}
+				  }
+				}
+				else {
+				  $output .= '<tr><td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . $data . '</td></tr>';
+				}
+			}
+		}
+	}
+	else{
+		$output .= '<td colspan="3" style="padding-bottom: 0.2em;padding-top: 0.1em; font-size: 10px;">' . ucwords($title) . '</td></tr>';
+		$cartitemcount = 0;
+		$output .= '<tr>';
+		$output .= '<td colspan="3" style="font-size: 10px;">';
+			$output .= '<table width="100%">';
+			$output .= '<tr><th scope="col" style="padding-bottom: 0.2em;padding-top: 0.1em; text-align: center; font-size: 10px;">Qty.</th><th scope="col" style="padding-bottom: 0.2em;padding-top: 0.1em; text-align: center; font-size: 10px;">Description</th><th scope="col" style="padding-bottom: 0.2em;padding-top: 0.1em; text-align: center; font-size: 10px;">Total Price</th></tr>';
+			
+			$cartitems = uc_cart_get_contents();
+			$subtotal = 0;
+			foreach ($cartitems as $cartitem) { 
+				$display_item = module_invoke($cartitem->module, 'uc_cart_display', $cartitem);
+				if (!empty($display_item)) {
+					$output .= '<tr>';
+					$output .= '<td width="40" class="qty" align="center" style="padding-bottom: 0.2em;padding-top: 0.1em; text-align: center; font-size: 10px;">'.$cartitem->qty.'</td>';
+					$output .= '<td width="70%" class="desc" style="padding-bottom: 0.2em;padding-top: 0.1em; text-align: center; font-size: 10px;">'.$cartitem->title.'</td>';
+					$output .= '<td class="unit_price" style="padding-bottom: 0.2em;padding-top: 0.1em; text-align: center; font-size: 10px;">'.uc_currency_format($cartitem->qty * $cartitem->price).'</td>';
+					$output .= '</tr>';
+					$cartitemcount += 1;
+				}
+			}
+			
+			$output .= '</table>';
+		$output .= '</td>';
+		$output .= '</tr>';
+	}
+  
+	}
+	$output .= '<tr class="review-button-row" style="background-color: #DDDDDD;border: 1px solid #999999;">';
+	$output .= '<td colspan="3" id="printbutton" style="padding-top: 1em;text-align: right;"></td>';
+	$output .= '</tr>';
+	$output .= '</table><br /><br />';
+	if($cartitemcount > 3){
+		$output .= '<strong class="howtopay" style="font-size:10px; page-break-after:always;">How to pay:</strong>';
+	}else{
+		$output .= '<strong class="howtopay" style="font-size:10px; ">How to pay:</strong>';
+	}
+
+	
+	$email_bdo_instruction = variable_get('sandcart_email_bdo_instruction','');
+	$email_value = array($order_ref ,number_format($order_total, 2, '.', ','));
+	$email_placeholders = array(":order_ref_no",":order_total");
+	$email_output = str_replace($email_placeholders, $email_value, $email_bdo_instruction);
+
+	// PDF
+	$bdo_instruction = variable_get('sandcart_bdo_instruction','');
+	$value = array($order_ref ,number_format($order_total, 2, '.', ','));
+	$placeholders = array(":order_ref_no",":order_total");
+	$pdf_output = str_replace($placeholders, $value, $bdo_instruction);
+
+	$qry = "SELECT COUNT(*) FROM {sandcart_bdo_complete} WHERE order_id = :order_id";
+	$qry_order_id = db_query($qry,array(':order_id' => $order_id))->fetchField();
+	
+	if($qry_order_id == 0){
+		$insert_bdo_complete = db_insert('sandcart_bdo_complete')
+			->fields(array(
+				'order_id' => $order_id,
+				'order_panes' => $output . $pdf_output,
+			))->execute();
+	}else{
+		$num_updated = db_update('sandcart_bdo_complete')
+			->fields(array(
+				'order_panes' => $output . $pdf_output,
+			))
+			->condition('order_id', $order_id)
+			->execute();
+	}
+	
+	
+	global $user;
+	$to = $user->mail;
+	$params['subject'] = "Your Order at SM Appliance Center";
+	$params['body'] = '<span style="font-size: 10px;">Hi ' .$user->name . '</span>, <br/><br />' . $output . $email_output . '<br /><br /><span style="font-size: 10px;">- SM Appliance Team</span>';
+	$params['order_id'] = $order_id;
+	drupal_mail('sandcart_payment', 'sandcart_payment_bdo_complete', $to, language_default(), $params,'no-reply@smappliance.com');
+
+	
+	$test = uc_cart_get_contents();
+	foreach($test as $item){
+		$cart_id = $item->cart_id;
+	}
+	uc_cart_empty($cart_id);
+	
+	return $output . $pdf_output;
+}

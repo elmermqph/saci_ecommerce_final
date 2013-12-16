@@ -1,0 +1,62 @@
+<?php
+/**
+ * @file
+ * Main module file.
+ */
+
+/**
+ * Implements hook_rules_ui_menu_alter().
+ */
+function rules_conditional_rules_ui_menu_alter(&$items, $base_path, $base_count) {
+  module_load_include('inc', 'rules_conditional', 'includes/rules_conditional.rules_admin');
+  _rules_conditional_rules_ui_menu_alter($items, $base_path, $base_count);
+}
+
+/**
+ * Creates a conditional.
+ */
+function rules_conditional() {
+  return new RulesConditional();
+}
+
+/**
+ * Creates an "if".
+ */
+function rules_conditional_if($predicate, array $settings = array()) {
+  return new RulesConditionalIf($predicate, $settings);
+}
+
+/**
+ * Creates an "else if".
+ */
+function rules_conditional_else_if($predicate, array $settings = array()) {
+  return new RulesConditionalElseIf($predicate, $settings);
+}
+
+/**
+ * Creates an "else".
+ */
+function rules_conditional_else() {
+  return new RulesConditionalElse();
+}
+
+/**
+ * Creates a "switch".
+ */
+function rules_conditional_switch($data_selector) {
+  return new RulesConditionalSwitch($data_selector);
+}
+
+/**
+ * Creates a "case".
+ */
+function rules_conditional_case($value, $fall_through = FALSE, $value_is_selector = FALSE) {
+  return new RulesConditionalCase($value, $fall_through, $value_is_selector);
+}
+
+/**
+ * Creates a "default case".
+ */
+function rules_conditional_default_case() {
+  return new RulesConditionalDefaultCase();
+}

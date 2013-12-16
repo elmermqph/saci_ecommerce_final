@@ -1,0 +1,100 @@
+#block-block-1 .content .social-post{
+background: url('/sites/default/files/imagehomethumb.png') no-repeat;
+height: 37px;
+position: relative;
+float: left;
+width: 100%;
+margin-bottom:0px;
+}
+
+#block-block-1 .content .social-post a{
+color: white;
+font-size: 16px;
+margin: 2px 0px 2px 52px;
+float: left;
+text-decoration: none;
+padding: 6px 33px;
+}
+#block-block-1 .content .social-post a:hover, #block-block-1 .content .social-post a.active{
+color:#1fd4ef;
+}
+
+
+#block-block-1 .content .social-post a.balikbayan{
+background: url('/sites/all/themes/fusion/sm_appliance/images/balikbayan-icon.png') no-repeat;
+background-position: -5px -5px;
+}
+
+#block-block-1 .content .social-post a.balikbayan:hover, #block-block-1 .content .social-post a.balikbayan.active{
+background: url('/sites/all/themes/fusion/sm_appliance/images/balikbayan-icon-hover.png') no-repeat;
+background-position: -5px -5px;
+}
+
+#block-block-1 .content .social-post a.registry{
+background: url('/sites/all/themes/fusion/sm_appliance/images/giftregistry-icon.png') no-repeat;
+background-position: -5px -5px;
+}
+
+#block-block-1 .content .social-post a.registry:hover, #block-block-1 .content .social-post a.registry.active{
+background: url('/sites/all/themes/fusion/sm_appliance/images/giftregistry-icon-hover.png')no-repeat;
+background-position: -5px -5px;
+}
+
+#block-block-1 .content .social-post a.shopping{
+background: url('/sites/all/themes/fusion/sm_appliance/images/shoppingguides-icon.png')  no-repeat;
+background-position: -5px -5px;
+}
+
+#block-block-1 .content .social-post a.shopping:hover, #block-block-1 .content .social-post a.shopping.active{
+background: url('/sites/all/themes/fusion/sm_appliance/images/shoppingguides-icon-hover.png') no-repeat;
+background-position: -5px -5px;
+}
+
+
+#block-block-1 .content .social-post .plugin{
+float: right;
+width: 235px;
+height: 37px;
+text-align: right;
+margin-left: 0px;
+}
+#block-block-1 .content .social-post .plugin a{
+padding: 0px 26px;
+margin: 8px 12px;
+float: left;
+}
+#block-block-1 .content .social-post .plugin a.facebook{
+height: 17px;
+width: 56px;
+background: url('/sites/default/files/facebook_home.png') no-repeat;
+padding: 0;
+background-position: 0px -17px;
+}
+
+#block-block-1 .content .social-post .plugin a.facebook:hover{
+background-position: 0px 0px;
+}
+
+#block-block-1 .content .social-post .plugin a.twitter{
+background: url('/sites/default/files/twitter_home.png') no-repeat;
+padding: 0;
+height: 19px;
+width: 58px;
+background-position: 0px -19px;
+}
+
+#block-block-1 .content .social-post .plugin a.twitter:hover{
+background-position: 0px 0px;
+}
+
+#block-block-1 .content .social-post .plugin a.email{
+background: url('/sites/default/files/email_home.png') no-repeat;
+padding: 0;
+height: 18px;
+width: 26px;
+background-position: 0px -18px;
+}
+
+#block-block-1 .content .social-post .plugin a.email:hover{
+background-position: 0px 0px;
+}

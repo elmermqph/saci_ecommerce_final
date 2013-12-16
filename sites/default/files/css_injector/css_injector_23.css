@@ -1,0 +1,24 @@
+#block-system-main{
+width:960px;
+}
+#block-system-main .view-id-order_productlist td{
+padding: 10px;
+}
+h1.title{
+display:none;
+}
+.print-site_name{
+display:none;
+}
+.prefix{
+text-decoration:line-through;
+}
+#block-system-main .view-id-order_productlist .views-row-last .total_vat_ex, 
+#block-system-main .view-id-order_productlist .views-row-last .vat_sales, 
+#block-system-main .view-id-order_productlist .views-row-last .vat_amt,
+#block-system-main .view-id-order_productlist .totalvalue .amount{
+border-bottom:1px solid #000;
+}
+.view-id-order_productlist .view-header{
+text-align:center;
+}

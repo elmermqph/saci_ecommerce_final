@@ -1,0 +1,24 @@
+#order-pane-products .order-pane-title .cost,
+#order-pane-products .sticky-table .cost{
+display:none;
+}
+
+#views-exposed-form-uc-orders-admin-page .views-exposed-widget, 
+#edit-sales-report-tracking-number-wrapper{
+display:none;
+}
+#views-exposed-form-uc-orders-admin-page .views-widget-filter-billing_first_name, 
+#views-exposed-form-uc-orders-admin-page .views-submit-button
+{
+display:block;
+}
+
+.page-admin-store-reports-sales-dashboard-sales-report #block-system-main{
+width:960px;
+}
+
+.page-admin-store-reports-sales-dashboard-sales-report .views-reset-button input{
+padding: 5px 10px;
+font-size: 12px;
+margin-top: 38px !important;
+}

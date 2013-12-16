@@ -1,0 +1,5 @@
+name = Automation Process File
+package = SM APPLIANCE CUSTOM DEVELOPMENT MODULE
+description = Automation Process File
+core = 7.x
+

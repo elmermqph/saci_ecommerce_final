@@ -1,0 +1,3 @@
+name = Text file upload
+description = Text file upload module
+core = 7.x 

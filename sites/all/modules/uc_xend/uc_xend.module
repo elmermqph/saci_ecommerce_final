@@ -1,0 +1,830 @@
+<?php
+define('UC_XEND_LIVE','https://www.xend.com.ph/api/');
+define('UC_XEND_TEST','https://www.xend.com.ph/apitest/');
+define("UC_XEND_API_TRACKING_SERVICE",'https://www.xend.com.ph/api/TrackingService.asmx?wsdl');
+define("UC_XEND_VOLUME_WEIGHT_FACTOR", 3500);
+
+/**
+ * @file
+ * Xend Business Solutions.
+ *
+ * Shipping quote module that interfaces with the Xend Web Services API
+ * to get rates for small package shipments.  Implements a SOAP Web Service
+ * client.
+ *
+ * @author dzieyzone.    <http://drupal.org/user/269019>
+ */
+ 
+// Set to 0 to disable caching of SOAP WSDL when developing your WSDL
+ini_set("soap.wsdl_cache_enabled", 0);
+
+/******************************************************************************
+ * Drupal Hooks                                                               *
+ ******************************************************************************/
+
+/**
+ * Implements hook_menu().
+ */
+function uc_xend_menu() {
+  $items = array();
+
+  $items['xend/get-token'] = array(
+    'title' => 'Xend Web Token',
+    'page callback' => 'uc_xend_get_token',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+		'file' => 'uc_xend.pages.inc',
+  );
+  $items['admin/store/settings/quotes/settings/xend'] = array(
+    'title' => 'Xend',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('uc_xend_admin_settings'),
+    'access arguments' => array('configure quotes'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'uc_xend.admin.inc',
+  );
+  $items['admin/store/orders/%uc_order/shipments/xend'] = array(
+    'title' => 'Xend shipment',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('uc_xend_confirm_shipment', 3),
+    'access arguments' => array('fulfill orders'),
+    'file' => 'uc_xend.ship.inc',
+  );
+  $items['admin/store/orders/%uc_order/shipments/labels/xend'] = array(
+    'page callback' => 'theme',
+    'page arguments' => array('uc_xend_label_image'),
+    'access arguments' => array('fulfill orders'),
+    'file' => 'uc_xend.ship.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * Deletes XEND shipping labels from the file system automatically
+ * on a periodic basis.  Cron must be enabled for automatic deletion.
+ * Default is never delete the labels, keep them forever.
+ */
+function uc_xend_cron() {
+
+}
+
+/**
+ * Implements hook_theme().
+ */
+function uc_xend_theme() {
+  return array(
+    'uc_xend_option_label' => array(
+      'variables' => array(
+        'service'  => NULL,
+        'packages' => NULL,
+      ),
+    ),
+    'uc_xend_confirm_shipment' => array(
+      'render element' => 'form',
+      'file' => 'uc_xend.ship.inc',
+    ),
+  );
+}
+
+/**
+ * Implements hook_form_alter().
+ *
+ * Adds package type to products.
+ *
+ * @see uc_product_form()
+ * @see uc_xend_product_alter_validate()
+ */
+function uc_xend_form_alter(&$form, &$form_state, $form_id) {
+  if (uc_product_is_product_form($form)) {
+    $node = $form['#node'];
+
+    $enabled = variable_get('uc_quote_enabled', array()) + array('xend' => FALSE);
+    $weight = variable_get('uc_quote_method_weight', array()) + array('xend' => 0);
+
+    $xend = array(
+      '#type' => 'fieldset',
+      '#title' => t('Xend product description'),
+      '#collapsible' => TRUE,
+      '#collapsed' => ($enabled['xend'] == FALSE ),
+      '#weight' => $weight['xend'],
+      '#tree' => TRUE,
+    );
+    $xend['pkg_type'] = array(
+      '#type' => 'select',
+      '#title' => t('Package type'),
+      '#options' => _uc_xend_pkg_types(),
+      '#default_value' => isset($node->xend['pkg_type']) ? $node->xend['pkg_type'] : variable_get('uc_xend_ShipmentType', 'Parcel'),
+    );
+
+    $form['shipping']['xend'] = $xend;
+    if ($enabled['xend']) {
+      $form['#validate'][] = 'uc_xend_product_alter_validate';
+    }
+  }
+}
+
+/**
+ * Validation handler for Xend product fields.
+ *
+ * @see uc_xend_form_alter()
+ */
+function uc_xend_product_alter_validate($form, &$form_state) {
+	$values = $form_state['values'];
+  if ( $values['shippable'] && $values['xend']['pkg_type'] ) {
+    if ((empty($values['dim_length']) || empty($values['dim_width']) || empty($values['dim_height'])) || empty($values['weight'])) {
+      form_set_error('base][dimensions', t('Dimensions or weight are required for custom packaging.'));
+    }
+  }
+}
+
+/**
+ * Implements hook_node_insert().
+ */
+function uc_xend_node_insert($node) {
+  uc_xend_node_update($node);
+}
+
+/**
+ * Implements hook_node_update().
+ */
+function uc_xend_node_update($node) {
+  if (uc_product_is_product($node->type)) {
+    if (isset($node->xend)) {
+      $xend_values = $node->xend;
+      if (empty($node->revision)) {
+        db_delete('uc_xend_products')
+          ->condition('vid', $node->vid)
+          ->execute();
+      }
+
+      db_insert('uc_xend_products')
+        ->fields(array(
+          'vid' => $node->vid,
+          'nid' => $node->nid,
+          'pkg_type' => $xend_values['pkg_type'],
+        ))
+        ->execute();
+    }
+  }
+}
+
+/**
+ * Implements hook_node_load().
+ */
+function uc_xend_node_load($nodes, $types) {
+  $product_types = array_intersect(uc_product_types(), $types);
+
+  if (empty($product_types)) {
+    return;
+  }
+
+  $vids = array();
+  $shipping_type = variable_get('uc_store_shipping_type', 'Parcel');
+  $shipping_types = db_query("SELECT id, shipping_type FROM {uc_quote_shipping_types} WHERE id_type = :type AND id IN (:ids)", array(':type' => 'product', ':ids' => array_keys($nodes)))->fetchAllKeyed();
+
+  foreach ($nodes as $nid => $node) {
+    if (!in_array($node->type, $product_types)) {
+      continue;
+    }
+
+    if (isset($shipping_types[$nid])) {
+      $node->shipping_type = $shipping_types[$nid];
+    }
+    else {
+      $node->shipping_type = $shipping_type;
+    }
+
+    if ($node->shipping_type) {
+      $vids[$nid] = $node->vid;
+    }
+  }
+
+  if ($vids) {
+    $result = db_query("SELECT * FROM {uc_xend_products} WHERE vid IN (:vids)", array(':vids' => $vids), array('fetch' => PDO::FETCH_ASSOC));
+    foreach ($result as $xend) {
+      $nodes[$xend['nid']]->xend = $xend;
+    }
+  }
+}
+
+/**
+ * Implements hook_node_delete().
+ */
+function uc_xend_node_delete($node) {
+  db_delete('uc_xend_products')
+    ->condition('nid', $node->nid)
+    ->execute();
+}
+
+/**
+ * Implements hook_node_revision_delete().
+ */
+function uc_xend_node_revision_delete($node) {
+  db_delete('uc_xend_products')
+    ->condition('vid', $node->vid)
+    ->execute();
+}
+
+/******************************************************************************
+ * Ubercart Hooks                                                             *
+ ******************************************************************************/
+
+/**
+ * Implements hook_uc_shipping_type().
+ */
+function uc_xend_uc_shipping_type() {
+  $weight = variable_get('uc_quote_type_weight', array('Parcel' => 0, 'Document'=>0));
+
+  $types = array();
+  $types['Parcel'] = array(
+    'id' => 'Parcel',
+    'title' => t('Parcel'),
+    'weight' => $weight['Parcel'],
+  );
+
+  $types['Document'] = array(
+    'id' => 'Document',
+    'title' => t('Document'),
+    'weight' => $weight['Document'],
+  );
+
+  return $types;
+}
+
+/**
+ * Implements hook_uc_shipping_method().
+ */
+function uc_xend_uc_shipping_method() {
+  $methods['xend_parcel'] = array(
+    'id' => 'xend_parcel',
+    'module' => 'uc_xend',
+    'title' => t('Xend (Parcel)'),
+    'operations' => array(
+      'configure' => array(
+        'title' => t('configure'),
+        'href' => 'admin/store/settings/quotes/settings/xend',
+      ),
+    ),
+    'quote' => array(
+      'type' => 'Parcel',
+      'callback' => 'uc_xend_quote',
+      'accessorials' => array('Parcel'=>t('Xend Express (Parcel)')),
+    ),
+    'ship' => array(
+      'type' => 'Parcel',
+      'callback' => 'uc_xend_fulfill_order',
+      'file' => 'uc_xend.ship.inc',
+      'pkg_types' => array('Parcel'=>t('Parcel')),
+    ),
+  );
+  $methods['xend_document'] = array(
+    'id' => 'xend_document',
+    'module' => 'uc_xend',
+    'title' => t('Xend (Document)'),
+    'operations' => array(
+      'configure' => array(
+        'title' => t('configure'),
+        'href' => 'admin/store/settings/quotes/settings/xend',
+      ),
+    ),
+    'quote' => array(
+      'type' => 'Document',
+      'callback' => 'uc_xend_quote',
+      'accessorials' => array('Document'=>t('Xend Express (Document)')),
+    ),
+    'ship' => array(
+      'type' => 'Document',
+      'callback' => 'uc_xend_fulfill_order',
+      'file' => 'uc_xend.ship.inc',
+      'pkg_types' => array('Document'=> t('Document')),
+    ),
+  );
+
+  return $methods;
+}
+
+/**
+ * Implements hook_uc_store_status().
+ *
+ * Lets the administrator know that the Xend account information has not been
+ * filled out.
+ */
+function uc_xend_uc_store_status() {
+  $messages = array();
+
+  $usertoken  = (variable_get('uc_xend_DeveloperID', '') != '') && (variable_get('uc_xend_UserToken', '') != '');
+
+  if ($usertoken) {
+    $messages[] = array(
+      'status' => 'ok',
+      'title' => t('Xend Web Service'),
+      'desc' => t('Information needed to access Xend Web Service has been entered.'),
+    );
+  }
+  else {
+    $messages[] = array(
+      'status' => 'error',
+      'title' => t('Xend Web Service'),
+      'desc' => t('More information is needed to access Xend Web Service. Please enter it <a href="!url">here</a>.', array('!url' => url('admin/store/settings/quotes/settings/xend'))),
+    );
+  }
+
+  return $messages;
+}
+
+/******************************************************************************
+ * Module Functions                                                           *
+ ******************************************************************************/
+
+/**
+ * Callback for retrieving a Xend shipping quote.
+ *
+ * Requests a quote of all available FedEx services.  Quote returned
+ * from the Xend server is parsed and only the selected services are
+ * presented to the user.
+ *
+ * @param $products
+ *   Array of cart contents.
+ * @param $details
+ *   Order details other than product information.
+ *
+ * @return
+ *   JSON object containing rate, error, and debugging information.
+ */
+function uc_xend_quote($products, $details, $method) {
+
+  // The uc_quote AJAX query can fire before the customer has completely
+  // filled out the destination address, so check to see whether the address
+  // is complete. If not, abort.
+  $destination = (object) $details;
+
+  if ( empty($destination->zone ) ) {
+    // Skip this shipping method.
+    return array();
+  }
+  
+  
+//  $delivery_status = delivery_status($details['city'],$details['street2']);
+//  
+//  
+//  
+//  if($delivery_status != 0){
+//	return array();
+//  }
+
+	//Retrieve zone name to be pass on SOAP API
+  $destination->zone_name = uc_zone_get_by_id($destination->zone);
+
+  // Assign computed product weight
+  $packages = _uc_xend_package_products($products);
+  if ( $packages->weight == 0 || $packages->price == 0 ) {
+    // Skip this shipping method.
+    return array();
+  }
+
+  $debug = user_access('configure quotes') &&
+           variable_get('uc_quote_log_errors', FALSE);
+
+  // Call the method that does the actual SOAP request to the FedEx Server
+  // Response contains all available services and rates
+  $response = uc_xend_rate_request($packages, $destination, $method['quote']['type']);
+
+  // Initialize return array
+  $quotes  = array();
+
+  if (!isset($response->CalculateResult)) {
+    return $quotes;
+  }
+  $quotes[$method['quote']['type']] = array(
+	  'rate' => $response->CalculateResult,
+		'format' => uc_currency_format($response->CalculateResult),
+		'option_label' => theme('uc_xend_option_label',
+														array('service' => $method['quote']['type'],
+														      'packages' => $packages)
+														),  // cart pane
+      );
+  // Sort rate quotes in order of increasing price
+  uasort($quotes, 'uc_quote_price_sort');
+
+  return $quotes;
+}
+
+/**
+ * Packages products using Xend
+ *
+ * $package object returned from this routine contains the following members:
+ *   - quantity:     Number of items in package.
+ *
+ *
+ * @param $products
+ *   An array of nodes of type product.
+ *
+ * @return
+ *   An array of package objects, each containing one or more of the products.
+ */
+function _uc_xend_package_products($products) {
+  //TODO: group package by parcel or document
+	//TODO: convert weight in KG or dimension to CM
+	//length_units
+	//weight_units
+	
+
+  // Create first package
+  $package = new stdClass();
+  $package->weight = 0;
+	$package->price = 0;
+
+  // Loop over products
+  foreach ($products as $product) {
+		//calculate the volumetric weight of the product
+		$volumetric_weight = _uc_xend_volumetric_weight_calc($product);
+
+		//compare the actual weight from volumetric weight, store whichever is higher
+		$chargeable_weight = ($product->weight >= $volumetric_weight) ? $product->weight : $volumetric_weight;
+
+		//multiply the chargeable weight from the quantity per product
+		$total_product_weight = $chargeable_weight * $product->qty;
+
+		$package->price += $product->price * $product->qty;
+		$package->weight += $total_product_weight;
+		
+		//group by parcel or by document
+//		$packages[$product->xend['pkg_type']]['price'] += $product->price * $product->qty;
+//		$packages[$product->xend['pkg_type']]['weight'] += $total_product_weight;
+	}
+
+  return $package;
+}
+
+/**
+ * Calculate the Volumetric weight of the product
+ */
+function _uc_xend_volumetric_weight_calc($product){
+  return ($product->length * $product->width * $product->height) / UC_XEND_VOLUME_WEIGHT_FACTOR; 
+}
+/**
+ * Theme function to format the Xend service name and rate amount line-item
+ * shown to the customer.
+ *
+ * @param $variables
+ *   Associative array containing information needed to theme a quote.
+ *   Contains two keys:
+ *   - service: The Xend service name.
+ *   - packages: Package information.
+ *
+ * @ingroup themeable
+ */
+function theme_uc_xend_option_label($variables) {
+  $service = $variables['service'];
+  $packages = $variables['packages'];
+
+  // Start with logo as required by the Xend terms of service.
+  $output  = theme('image', array(
+    'path' => drupal_get_path('module', 'uc_xend') . '/XendExpressLOGO.gif',
+    'alt' => t('Xend logo'),
+    'attributes' => array('class' => 'xend-logo')
+  ));
+
+  // Add the Xend service name.
+  $output .= t('@service Rate', array('@service' => $service));
+
+  return $output;
+}
+
+/**
+ * Convenience function to get Xend codes for their package types.
+ */
+function _uc_xend_pkg_types() {
+  return array(
+    // Customer Supplied Page is first so it will be the default
+    'Parcel' => t('Parcel'),
+    'Document' => t('Document'),
+  );
+}
+
+/**
+ * Export Type
+ */
+function _uc_xend_purpose_of_export_type(){
+	return array(
+    'Gift' => t('Gift'),
+    'Personal' => t('Personal'),
+    'Documents' => t('Documents'),
+    'CommercialSample' => t('Commercial Sample'),
+    'Other' => t('Other'),
+    'None' => t('None'),
+	);
+}
+
+/**
+ * Return the Service Type base on delivery zone
+ */
+function _uc_get_servicetype($zone){
+  switch ($zone){
+		case 405: //metromanila
+		  return 'MetroManilaExpress';
+		break;
+		default:
+		  return 'ProvincialExpress';
+	}
+}
+/**
+ * Constructs and executes a SOAP RateService request.
+ * Obtains Rate and Available Services information needed for
+ * shipping quote.
+ *
+ * SOAP call parameters are set in the order they appear in the WSDL file
+ * Associative array of DOM returned.
+ *
+ * @param $packages
+ *   Array of packages received from the cart.
+ * @param $destination
+ *   Delivery destination address information.
+ *
+ * @return
+ *   Associative array mirroring contents of SOAP object returned from server.
+ */
+function uc_xend_rate_request($packages, $destination, $quote_type = 'Parcel') {
+	$ServiceTypeValue = _uc_get_servicetype($destination->zone);
+
+  // Set up SOAP call.
+  // Allow tracing so details of request can be retrieved for error logging
+  $client = new SoapClient( UC_XEND_LIVE . 'RateService.asmx?wsdl' , array('trace' => 1));
+	$funcs = $client->__getFunctions();
+	// initialize SOAP header
+	$headerbody = array('UserToken' => strtoupper(variable_get('uc_xend_DeveloperID','')));
+	$header = new SOAPHeader( UC_XEND_LIVE , 'AuthHeader', $headerbody);
+	$client->__setSoapHeaders($header);
+
+	// prepare parameters
+	$param = array(
+		'ServiceTypeValue' => $ServiceTypeValue,
+		'ShipmentTypeValue' => $quote_type,
+		'DestinationValue' => $destination->zone_name,
+		'Weight' => $packages->weight,
+		'DimensionL' => 0.00,
+		'DimensionW' => 0.00,
+		'DimensionH' => 0.00,
+		'DeclaredValue' => $packages->price,
+		'AddInsurance' => variable_get('uc_xend_insurance', true));
+
+	// execute SOAP method
+	try	{
+	  $response = $client->Calculate($param);
+		if ($response->CalculateResult) {
+      _uc_xend_print_request_response($client);
+    }
+    else {
+      drupal_set_message(t('Error in processing Xend Shipping Quote transaction.'), 'error');
+			if (variable_get('uc_quote_log_errors', FALSE)) {
+				watchdog('uc_xend', '$response was: <pre>@response</pre>',
+						 array('@response' => print_r($response, TRUE)
+									 ),
+						 WATCHDOG_WARNING );
+			}
+    }
+    return $response;
+	}
+	catch (SoapFault $soapfault) {
+		if (variable_get('uc_quote_log_errors', FALSE)) {
+		  _uc_xend_print_soapfault($soapfault);
+		}
+	  drupal_set_message('Error in processing Xend Shipping Quote transaction.', 'error');
+		return FALSE;
+	}
+}
+
+function _uc_xend_print_soapfault($soapfault){
+	//log error if permitted
+  if (variable_get('uc_quote_log_errors', FALSE)) {
+		$exception = $soapfault->getMessage();
+		preg_match_all('/: (.*?). at/s', $exception, $error, PREG_SET_ORDER);
+		$error_detail = '<h2>Fault</h2><br /><b>Message:</b>' . $error[0][1] ;
+		watchdog('uc_xend', '$error_detail was: <pre>@error_detail</pre>',
+					 array('@error_detail' => print_r($error_detail, TRUE)
+								 ),
+					 WATCHDOG_WARNING );
+	}
+}
+
+/**
+ * Prints SOAP request and response, if allowed by user access permissions.
+ *
+ * To view transaction details, set display debug TRUE in
+ * admin/store/settings/quotes/edit
+ *
+ * @param $client
+ *   SOAP client object containing transaction history.
+ */
+function _uc_xend_print_request_response($client) {
+	if (user_access('configure quotes') && variable_get('uc_quote_log_errors', FALSE)) {
+    drupal_set_message('<h2>Xend Transaction processed successfully.</h2>' .
+                       '<h3>Request: </h3><pre>' .
+                       check_plain($client->__getLastRequest())  . '</pre>' .
+                       '<h3>Response: </h3><pre>' .
+                       check_plain($client->__getLastResponse()) . '</pre>');
+  }
+}
+
+/**
+ * Constructs an XML shipment request.
+ *
+ * @param $session
+ *   Stored session xend valud
+ *
+ * @return
+ *   ShipConfirm XML document to send to Xend.
+ */
+function uc_xend_shipment_request($xend_session) {
+  $packages = $xend_session['packages'];
+	$destination = $xend_session['destination'];
+	//$xend_service = $xend_session['service'];
+
+  // initialize SOAP client
+  $wsdl = (variable_get('uc_xend_connection_type','test') == 'test') ? UC_XEND_TEST : UC_XEND_LIVE;
+  $client = new soapclient($wsdl . 'ShipmentService.asmx?wsdl', array('trace' => 1));
+  $funcs = $client->__getFunctions();
+
+  // initialize SOAP header
+  $headerbody = array('UserToken' => variable_get('uc_xend_UserToken',''));
+  $header = new SOAPHeader($wsdl, 'AuthHeader', $headerbody);
+  $client->__setSoapHeaders($header);
+  $response = array();
+
+  foreach ($packages as $package_id=>$package) {
+    // prepare parameters
+    $serviceType = _uc_get_servicetype($destination->zone);
+    $param = array(
+      'ServiceTypeValue' => $serviceType,
+      'ShipmentTypeValue' => $package->shipping_type,
+      'Weight' => $package->weight,
+      'DimensionL' => $package->length,
+      'DimensionW' => $package->width,
+      'DimensionH' => $package->height,
+      'DeclaredValue' => $package->value,
+      'RecipientName' => $destination->first_name . ' ' . $destination->last_name,
+      'RecipientCompanyName' => $destination->company,
+      'RecipientAddress1' => $destination->street1,
+      'RecipientAddress2' => $destination->street2,
+      'RecipientCity' => $destination->city,
+      'RecipientProvince' => $destination->zone_name,
+      'RecipientCountry' => $destination->country_name,
+      'IsInsured' => variable_get('uc_xend_insurance', true),
+      'SpecialInstructions' => implode("\n", (array)$destination->order_comment),
+      'Description' => $package->description,
+      'ClientReference' => $package_id,
+			'PurposeOfExportValue'=> $package->export_purpose,
+			'DateCreated'=> date("c"), //expose to user or not
+			'DatePrinted'=> date("c"), //expose to user or not
+			'ShippingFee'=>$package->paid,
+			'InsuranceFee'=>0,
+    );
+
+    // execute SOAP method
+    try  {
+			$parameters = array();
+			$parameters['shipment'] = $param;
+			if ((variable_get('uc_xend_connection_type','test') == 'live') && variable_get('uc_xend_createDev', FALSE) ){
+				$parameters['fromField'] = variable_get('uc_xend_From_field', '');
+				$result = $client->CreateDev($parameters);
+				$response[$package_id] = $result->CreateDevResult;
+			}
+			else {
+				$result = $client->Create($parameters);
+				$response[$package_id] = $result->CreateResult;
+			}
+    }
+    catch (SoapFault $soapfault) {
+      $exception = $soapfault->getMessage();
+			drupal_set_message('Error occured. Check the error log or ask the administrator for assistance.');
+      preg_match_all('/: (.*?). at/s', $exception, $error, PREG_SET_ORDER);
+			$errors = array(
+								 'error_detail' => $exception,
+								 'error'=>$error,
+								);
+			_uc_xend_log_error( $errors );
+			return FALSE;
+    }
+  }
+  return $response;
+}
+
+function uc_xend_generate_waybill($order){
+	$package_id = '';
+	$package = array();
+	$declared_value = 0;
+	$product_list = array();
+  $order_id = $order->order_id;
+
+	//*
+	foreach ($order->products as $id=>$product) {
+		$package['products'][$id] = $product;
+    if ($product->data['shippable']) {
+      $package['shipping_type'] = uc_product_get_shipping_type($product);
+    }
+	}
+	$package['order_id'] = $order->order_id;
+  uc_shipping_package_save($package);
+	//retrieve the single package
+	$package_id = db_query("SELECT package_id FROM {uc_packages} WHERE order_id = :id", array(':id' => $order->order_id))->fetchField();
+	$packageSubmit = uc_shipping_package_load($package_id);
+	if ($packageSubmit) {
+		$address = reset($packageSubmit);
+		$origin = new stdClass();
+		$origin->phone = $address['phone'];
+		$origin->first_name = $address['first_name'];
+		$origin->last_name = $address['last_name'];
+		$origin->company = $address['company'];
+		$origin->street1 = $address['street1'];
+		$origin->street2 = $address['street2'];
+		$origin->city = $address['city'];
+		$origin->zone = $address['zone'];
+		$origin->country = $address['country'];
+		$origin->postal_code = $address['postal_code'];
+		$origin->email = uc_store_email();
+
+    $destination = new stdClass();
+		$destination->phone = $order->delivery_phone;
+		$destination->first_name = $order->delivery_first_name;
+		$destination->last_name = $order->delivery_last_name;
+		$destination->company = $order->delivery_company;
+		$destination->street1 = $order->delivery_street1;
+		$destination->street2 = $order->delivery_street2;
+		$destination->city = $order->delivery_city;
+		$destination->zone = $order->delivery_zone;
+		$destination->country = $order->delivery_country;
+		$destination->postal_code = $order->delivery_postal_code;
+		$destination->email = $order->primary_email;
+		$destination->order_comment = uc_order_comments_load($order_id);
+		if (empty($destination->company)) {
+      $destination->company = $destination->first_name . ' ' . $destination->last_name;
+		}
+		
+		$destination->zone_name = uc_zone_get_by_id($destination->zone);
+		$destination->country_name = uc_country_get_by_id($destination->country);
+		
+    foreach ($packageSubmit->products as $product) {
+      $declared_value += $product->qty * $product->price;
+    }
+		
+		$package               = clone $packageSubmit;
+    $package->pkg_type     = $packageSubmit->shipping_type;
+    $package->value        = $declared_value;
+    $package->weight       = isset($packageSubmit->weight) ? $packageSubmit->weight : 1; //hack to allow sending even if no weight
+    $package->weight_units = isset($packageSubmit->weight_units) ? $packageSubmit->weight_units : variable_get('uc_weight_unit', 'kg');
+    $package->length       = isset($packageSubmit->length) ? $packageSubmit->length : 0;
+    $package->width        = isset($packageSubmit->width) ? $packageSubmit->width : 0;
+    $package->height       = isset($packageSubmit->height) ? $packageSubmit->height : 0;
+    $package->length_units = isset($packageSubmit->length_units) ? $packageSubmit->length_units :variable_get('uc_length_unit', 'cm');
+		$package->export_purpose 	= variable_get('uc_xend_PurposeOfExportType', 'None');
+		$package->paid = $order->quote['rate'];
+		
+		
+		$xend_package['packages'][$package_id] = $package;
+		$xend_package['origin'] = $origin;
+		$xend_package['destination'] = $destination;
+		$xend_package['service'] = $package->pkg_type;
+	
+    if ($response = uc_xend_shipment_request($xend_package)){
+		  if (variable_get('uc_xend_BookingService', FALSE)){
+			//  $request = uc_xend_request_pickup($order_id, $packages);
+		  }
+		$shipment = new stdClass();
+		$shipment->order_id = $order_id;
+		$shipment->origin = clone $xend_package['origin'];
+		$shipment->destination = $xend_package['destination'];
+		$shipment->packages = $xend_package['packages'];
+		$shipment->shipping_method = 'xend';
+		$shipment->accessorials = $xend_package['service'];
+		$shipment->carrier = t('Xend');
+		
+		  foreach($response as $package_id=>$waybill){
+			  $shipment->tracking_number = (string) $waybill;
+			  $package =& current($shipment->packages);
+			  $package->tracking_number = (string) $waybill;
+			  unset($package);
+			  next($shipment->packages);
+		  }
+		  uc_shipping_shipment_save($shipment);
+	  }
+	  else {
+		  drupal_set_message('Unable to ship package. Check your system logs or contact your administrator.');
+			$errors = array('xend_package'=> $xend_package);
+			_uc_xend_log_error($errors);
+	  }
+  }
+}
+
+function _uc_xend_log_error($errors) {
+	$message = array();
+	$vars = array();
+	foreach ($errors as $error_name=>$error){
+		$message[] = '$'.$error_name .'was: <pre>@'. $error_name.'</pre>';
+		$vars['@'.$error_name] = print_r($error, true);
+	}
+	$messages = implode('<hr/>', $message);
+	watchdog('uc_xend', $messages, $vars, WATCHDOG_WARNING );
+}

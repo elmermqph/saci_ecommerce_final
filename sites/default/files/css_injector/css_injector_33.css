@@ -1,0 +1,14 @@
+#content-messages-inner .messages{
+   display:none;
+}
+
+#content-group-inner{
+    position: relative;
+}
+
+#user-reset-red-cart{
+	top: 15px;
+    left: 550px;
+    position: absolute;
+    
+}

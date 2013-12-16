@@ -1,0 +1,4 @@
+name = MMS generator
+package = SM APPLIANCE CUSTOM DEVELOPMENT MODULE
+description = SM Appliance xml mms custom module
+core = 7.x 

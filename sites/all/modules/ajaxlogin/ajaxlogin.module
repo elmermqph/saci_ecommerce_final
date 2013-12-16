@@ -1,0 +1,151 @@
+<?php 
+
+/**
+ * Implementation of hook_menu()
+ */
+function ajaxlogin_menu() {
+  $items = array();
+  
+  $items['ajaxlogin/password'] = array(
+    'title' => 'Request new password',
+    'page callback' => 'ajaxlogin_password_form',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'file' => 'ajaxlogin.pages.inc',
+  );
+  
+  $items['ajaxlogin/user_login'] = array(
+    'title' => 'Ajax user login',
+    'page callback' => 'ajaxlogin_login_ajax_callback',
+    'access callback' => 'user_is_anonymous',
+    'type' => MENU_CALLBACK,
+    'file' => 'ajaxlogin.pages.inc',
+    'delivery callback' => 'ajaxlogin_ajax_deliver_callback',
+  );
+  
+  $items['ajaxlogin/request_password'] = array(
+    'title' => 'Request password Ajax',
+    'page callback' => 'ajaxlogin_request_password_ajax_callback',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'file' => 'ajaxlogin.pages.inc',
+    'delivery callback' => 'ajaxlogin_ajax_deliver_callback',
+  );
+  
+  return $items;
+}
+
+/**
+ * Custom delvery callback
+ */
+function ajaxlogin_ajax_deliver_callback($page_callback_result) {
+  print $page_callback_result;
+  ajax_footer();
+}
+
+/**
+ * Implementation of hook_url_outbound_alter
+ */
+function ajaxlogin_url_outbound_alter(&$path, &$options, $original_path) {
+  if ($path == 'user/password') {
+    $path = 'ajaxlogin/password/nojs';
+  }
+}
+
+/**
+ * Implementation of hook_page_build()
+ */
+function ajaxlogin_page_build(&$page) {
+  global $user;
+/*
+  if (!$user->uid && !(arg(0) == 'user' || (arg(0) == 'yelmo' && arg(1) == 'password'))) {  
+    $login_link = l('Login', 'user/login', array('attributes' => array('class' => array('login-ajax'))));
+    
+    $form_id = 'ajaxlogin_login_block_form';
+    
+    $page['yelmo']['login'] = "<div id='yelmo-login-block'><span>$login_link</span>";
+    $page['yelmo']['login'] .= drupal_render(drupal_get_form($form_id));
+    $page['yelmo']['login'] .= '</div>';
+  }
+*/
+  }
+
+
+/**
+ * Custom Functions 
+ */
+
+/**
+ * Implementation of hook_block_info()
+ */
+function ajaxlogin_block_info() {
+  $blocks['ajaxlogin'] = array(
+    'info' => 'Ajaxlogin Block',
+  );
+  return $blocks;
+}
+
+function ajaxlogin_block_view($delta = 0) {
+  $block = array();
+  global $user;
+  if (!$user->uid && !(arg(0) == 'user' && !is_numeric(arg(1)))) {  
+    $block['subject'] = ('User login');
+    $block['content'] = drupal_get_form('ajaxlogin_login_block_form');
+  }
+  return $block;
+}
+
+/**
+ * Custom login form
+ */
+function ajaxlogin_login_block_form($form, &$form_state) { 
+  $form['errors'] = array('#markup' => '<div id="ajaxlogin-error"></div>');
+  
+  $form['#attached'] = array(
+    'js' => array(drupal_get_path('module', 'ajaxlogin') . '/js/ajaxlogin.js'),
+  );
+  
+  $form['#action'] = url($_GET['q'], array('query' => drupal_get_destination()));
+  
+  $form['#id'] = 'ajaxlogin-login-form';
+  
+  $form['#validate'] = user_login_default_validators();
+  
+  $form['#submit'][] = 'user_login_submit';
+  
+  $form['name'] = array('#type' => 'textfield',
+    '#title' => t('Username'),
+    '#maxlength' => USERNAME_MAX_LENGTH,
+    '#size' => 15,
+    '#required' => TRUE,
+  );
+  
+  $form['pass'] = array('#type' => 'password',
+    '#title' => t('Password'),
+    '#maxlength' => 60,
+    '#size' => 15,
+    '#required' => TRUE,
+  );
+  
+  $form['actions'] = array('#type' => 'actions');
+  
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Log in'),
+    '#ajax' => array(
+      'path' => 'ajaxlogin/user_login',
+    ),
+  );
+
+  $form['request_password'] = array(
+    '#type' => 'link',
+    '#title' => t('Request new password'),
+    '#href' => 'ajaxlogin/password/nojs/',
+    '#id' => 'ajax_link',
+    '#attributes' => array(
+      'class' => array('use-ajax'),
+    ),
+  );
+ 
+  return $form;
+}

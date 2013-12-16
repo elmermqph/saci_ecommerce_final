@@ -1,0 +1,7 @@
+name = SM Appliance Sales Dashboard
+description = SM Appliance Modification
+dependencies[] = views
+dependencies[] = uc_order
+core = 7.x
+files[] = uc_sm_dashboard.views.inc
+files[] = uc_sm_dashboard_handler_field_tracking_number.inc

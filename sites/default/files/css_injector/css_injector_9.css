@@ -1,0 +1,14 @@
+#block-system-main{width:960px;}
+#cart-form-pane {
+    background-color: #FEFEFE;
+    border: 1px solid #BBD4EC;
+    border-radius: 3px 3px 3px 3px;
+    float: left;
+    margin-bottom: 10px;
+    padding: 14px 0 0;
+    width: 938px;
+}
+#cart-form-pane td.image {
+    padding: 12px 0;
+    text-align: center;
+}
