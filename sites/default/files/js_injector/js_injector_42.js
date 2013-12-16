@@ -35,7 +35,6 @@ $("#uc-cart-checkout-form #edit-continue").live("click",function(){
 					inner_html = inner_html+'<li>Please Enter Mobile No.</li>';
 					condition = true
 			}
-
 			
 			if(condition == true){
 				if($("#uc-cart-checkout-form #delivery-pane .error").length>0)
@@ -122,6 +121,7 @@ $("#uc-cart-checkout-form #edit-continue").live("click",function(){
 			}
 		});
 			
-		$('#uc-cart-checkout-form #rewardcard-pane legend span').html('SM Advantage/Prestige/BDO Rewards Card');
+
+		$('#uc-cart-checkout-form #rewardcard-pane legend span').html('SM Advantage/Prestige/BDO Rewards card');
 	});
 })(jQuery);

@@ -2,9 +2,10 @@
 function sm_appliance_preprocess_page(&$vars) {
 	global $language, $theme_key, $theme_info, $user;
 	$browsercheck = browser();
-	if($browsercheck['name'] == "msie" && $browsercheck['version']<8){
+	if($browsercheck['name'] == "msie" && $browsercheck['version'] < 8){
 		drupal_goto('invalid_browser');
 	}
+	
 	if(arg(0) == 'user' && is_numeric(arg(1)) && arg(2) == 'edit' ){
 		drupal_goto('my-account');
 	}
@@ -28,7 +29,7 @@ function sm_appliance_preprocess_page(&$vars) {
 			drupal_add_library('system','ui.dialog');
 		}
 	}
-	
+	 
 	if((arg(0) == 'cart') && (arg(1) == 'hsbc-migs')){
 		if(!define('UC_HSBC_MIGS_ERROR_GENERAL_ERROR'))
 		define('UC_HSBC_MIGS_ERROR_GENERAL_ERROR',   'Problem Encountered');

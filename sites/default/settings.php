@@ -205,9 +205,9 @@ $databases = array (
   array (
     'default' => 
     array (
-      'database' => 'saci',
-      'username' => 'root',
-      'password' => '',
+      'database' => 'sm_appliances',
+      'username' => 'spinweb',
+      'password' => 'sp1nw3bmc1',
       'host' => 'localhost',
       'port' => '',
       'driver' => 'mysql',
@@ -314,7 +314,11 @@ ini_set('session.gc_maxlifetime', 200000);
  * the cookie. The value 0 means "until the browser is closed".
  */
 ini_set('session.cookie_lifetime', 2000000);
+<<<<<<< HEAD
 ini_set('memory_limit', '256M');
+=======
+ini_set('memory_limit', '500M');
+>>>>>>> b1a26b958960f3be14c07aba9092f7296ffae9c8
 
 /**
  * If you encounter a situation where users post a large amount of text, and

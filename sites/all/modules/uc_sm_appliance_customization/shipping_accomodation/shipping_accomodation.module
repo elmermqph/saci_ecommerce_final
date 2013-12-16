@@ -1160,6 +1160,12 @@ function portal_page(){
 					<li><a href="/admin/structure/block/manage/block/22/configure?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Block on Visa</a></li>
 					<li><a href="/admin/structure/block/manage/block/21/configure?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit Block on Mastercard</a></li>
 					<li><a href="/node/9000/edit?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit FAQ</a></li>
+
+					<li><a href="/node/10/edit?destination=dashboard"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit FAQ</a></li>
+					
+			</ul>
+			<ul>
+					<li><a href="/admin/config/bdo-instruction"><img src="/sites/default/files/SACI_Create-Product.png" /><br />Edit BDO Instructions</a></li>
 					
 			</ul>
 				

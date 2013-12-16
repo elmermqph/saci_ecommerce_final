@@ -31,7 +31,7 @@ function sandcart_payment_print(){
 			
 			$pdf_name = 'Order-'.$order_id.'.pdf';
 			$dompdf = new DOMPDF();
-			$dompdf->load_html($pdf_hmtl);
+			$dompdf->load_html($pdf_hmtl,'UTF-8');
 			$dompdf->render();
 			$dompdf->stream($pdf_name,array("Attachment" => 0));
 			echo $pdf_html;

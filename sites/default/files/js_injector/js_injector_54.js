@@ -69,7 +69,7 @@ $("#quicktabs-tabpage-admin_dashboard-2 #edit-created-max-wrapper .form-item-fil
                                 $("#pid-admin-dashboards #quicktabs-tabpage-admin_dashboard-2 #edit-reset").click(function(){
 					location.replace("/admin-dashboards?qt-admin_dashboard=2#qt-admin_dashboard");
 				});  
-                                $("#views-exposed-form-uc-orders-admin-page .views-exposed-form .views-exposed-widgets").append('<p style="font-style:italic;clear:both;font-size:10px;">if you want to search order id please include "orderid-" (e.g orderid-1234).</p>');
+$("#views-exposed-form-uc-orders-admin-page .views-exposed-form .views-exposed-widgets").append('<p style="font-style:italic;clear:both;font-size:10px;">if you want to search order id please include "orderid-" (e.g orderid-1234).</p>');
 $("#views-exposed-form-members-profile-page #edit-submit-members-profile").click(function(){
 			var main_url = '/dashboard/member_profile';
 			var search_value = $("#views-exposed-form-members-profile-page input#edit-field-first-name-value").val();
@@ -80,6 +80,7 @@ $("#views-exposed-form-members-profile-page #edit-submit-members-profile").click
 			}
 			return false;
 		});
+$("#views-exposed-form-uc-orders-admin-page .views-exposed-form .views-exposed-widgets").append('<p style="font-style:italic;clear:both;font-size:10px;">if you want to search order id please include "orderid-" (e.g orderid-1234).</p>');
 	});
 	function submit_search_checklocation(tabnumber){
 		var intRegex = /^\d+$/;

@@ -1,10 +1,9 @@
 (function($){
 	$(document).ready(function(e) {
-                var x_country = $("#edit-panes-billing-billing-country").val();
+	   var x_country = $("#edit-panes-billing-billing-country").val();
 		var country_name = $("#edit-panes-billing-billing-country option[value='"+x_country+"']").text();
 		$('<input type="text" class="classinput-txt" value="'+country_name+'" readonly="">').insertBefore("#edit-panes-billing-billing-country");
-
-		// $('<input type="text" class="classinput-txt" value="Philippines" readonly="">').insertBefore("#edit-panes-billing-billing-country");
+		$('<input type="text" class="classinput-txt" value="Philippines" readonly="">').insertBefore("#edit-panes-billing-billing-country");
 		var prov = $("#edit-panes-billing-billing-zone").val();
 		var prov_text = $("#edit-panes-billing-billing-zone option[value='" + prov + "']").text();
 		$('<input type="text" class="classinput-txt" value="'+prov_text+'" readonly="">').insertBefore("#edit-panes-billing-billing-zone");
@@ -92,8 +91,8 @@
 		if($("#quote").length > 0){
 			var rate = $.trim($("#quote").text());
 			if(rate == "Delivery Rate: P0.00"){
-				$("#quote").html("");
-				$("#quote").html("<span class='del_label'>Delivery Rate: </span><span class='del_error' style='color: red; font-weight: bold;'>Outside serviceable area.</span>");
+				$("#quote").html("<span class='del_label'>Delivery Rate: </span><span class='del_error' style='color: red; font-weight: bold;'>Out of Serviceable Area</span>");
+>>>>>>> b1a26b958960f3be14c07aba9092f7296ffae9c8
 				$("#quote").addClass("del_error");
 			}
 		}
@@ -150,7 +149,7 @@
 	});
 	
 	function checkout_add(){
-$('<div style="margin-left: 131px;width:258px;">We currently don’t deliver to this area. Thank you.</div>').insertAfter('#edit-panes-delivery-delivery-city');
+$('<div style="margin-left: 131px;width:258px;">We currently don’t service the areas not found in the listing. Thank you.</div>').insertAfter('#edit-panes-delivery-delivery-city');
 		$('<input type="text" class="classinput-txt" value="Philippines" readonly="readonly" style="background-color: silver;color: grey;">').insertBefore("#edit-panes-delivery-delivery-country");
 
 		$("#edit-panes-delivery-delivery-country").css("display","none");
@@ -205,7 +204,6 @@ $('<div style="margin-left: 131px;width:258px;">We currently don’t deliver to 
 			var delivery_brgy = $(this).val();
 			var brgy_name = $('#delivery-brgy option[value="'+delivery_brgy+'"]').attr('test');
 			$('#edit-panes-delivery-delivery-street2').val(brgy_name);
-			
 			$("#edit-panes-delivery-delivery-postal-code").trigger("blur");
 		});
 	}

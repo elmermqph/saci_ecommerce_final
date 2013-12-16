@@ -117,7 +117,16 @@ $_SESSION['test-card'] = '';
              <?php if ($help_text || $email_text || $store_footer): ?>
                   </table>
                   <hr noshade="noshade" size="1" />
-                  <br />			
+                  <br />
+                  <p><?php print t('*Kindly print and present the Sales Invoice to the Courier upon the delivery of the package. The Courier reserves the right not to release the package in case of non-presentation.'); ?></p>
+                  <p><?php print t('How to check delivery status:'); ?></p>
+                  <ol>
+                  	<li>To track your package, please retrieve your order's AWB number from your My Orders tab.</li>
+                  	<li>Then go to <a href="http://supplychain.2go.com.ph/index.asp" target="_blank">http://supplychain.2go.com.ph/index.asp</a> and input the AWB number on the upper right portion of the screen.</li>
+                  	<li>For delivery inquiries, you may contact 2GO directly through 77-99-222</li>                                        
+                  </ol>
+                  <hr noshade="noshade" size="1" />
+                  <br />
                   <?php if ($help_text): ?>
                   <p><b><?php print t('Where can I get assistance for my online transactions?'); ?></b><br />
                     <?php print t('Call our toll free number: Mondays through Sundays: 9:00AM to 9:00PM'); ?> <br />
@@ -135,21 +144,7 @@ $_SESSION['test-card'] = '';
               </tr>
               <?php endif; ?>
             </table></td>
-          </tr>
+          . </tr>
       </table></td>
   </tr>
 </table>
-<div>
-<p>Please expect orders to be delivered : </p>
-				   <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Within 7 working days for Metro Manila destinations <br>
-				   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Within 10 working days for Provincial destinations </p><br>
-</div>
-<div id="ins" style="font-size:12px;">
-<p style="font-size:12px;">*Kindly print and present the Sales Invoice to the Courier upon the delivery of the package. The Courier reserves the right not to release the package in case of non-presentation.</p>
-<p style="font-size:12px;">How to check delivery status:</p>
-<ul class="how-to-check-status">
-	<li style="list-style:none; font-size:12px;">1. To track your package, please retrieve your order’s AWB number from your My Orders tab.</li>
-    <li style="list-style:none; font-size:12px;">2. Then go to http://supplychain.2go.com.ph/index.asp and input the AWB number on the upper right portion of the screen.</li>
-    <li style="list-style:none; font-size:12px;">3. For delivery inquiries, you may contact 2GO directly through 77-99-222</li>
-</ul>
-</div>
