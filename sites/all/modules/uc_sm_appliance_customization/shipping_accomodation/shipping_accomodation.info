@@ -1,0 +1,5 @@
+name = Shipping Accomodation
+package = SM APPLIANCE CUSTOM DEVELOPMENT MODULE
+description = Page for shipping accomodation
+core = 7.x
+

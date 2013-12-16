@@ -1,0 +1,52 @@
+#edit-byadmin-information-form{
+	width:500px;
+}
+
+#edit-byadmin-information-form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+
+#edit-byadmin-information-form #edit-acc-active label{
+	float: none;
+    width: 50px;
+}
+
+#edit-byadmin-information-form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#edit-byadmin-information-form .form-item-acc-dateob .description{
+	color: red;
+    float: left;
+    margin-bottom: 10px;
+    margin-top: -10px;
+    padding-left: 118px;
+    width: 100%;
+}
+
+#edit-byadmin-information-form .form-item-acc-active{
+	float:left;
+	width:100%;
+}
+
+#edit-byadmin-information-form .form-item-acc-active .form-item-acc-active{
+	float:left;
+	width:75px;
+}
+
+#edit-byadmin-information-form .form-item-acc-active label{
+	padding-top: 8px;
+}
+
+#edit-byadmin-information-form #edit-submit{
+	float: left;
+    margin-right: 100px;
+}

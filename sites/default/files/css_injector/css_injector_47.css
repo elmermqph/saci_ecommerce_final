@@ -1,0 +1,79 @@
+#pid-admin-store-orders-view h1.title, 
+.page-admin-store-customer-check h1.title{
+	margin-top:10px;
+}
+#pid-admin-store-orders-view #block-system-main, #pid-admin-store-customers-view #block-system-main{
+	margin-top:0px;
+ width: 960px;
+}
+#pid-admin-store-customers-view .view-filters{
+ margin-bottom: 15px;
+}
+.view-id-uc_orders th, 
+.view-id-uc_customers th, 
+.view-id-sm_dashboard_sales th, 
+.view-id-product_item_management th, 
+#pid-admin-store-reports-stock .content th,
+#pid-admin-structure-taxonomy-all-appliances-list  .content th {
+	text-transform:uppercase;
+	padding:5px;
+	border:1px solid #000;
+	background:#AAA;
+}
+
+.view-id-sm_dashboard_sales th, 
+.view-id-product_item_management th, 
+#pid-admin-store-reports-stock .content th,
+#pid-admin-structure-taxonomy-all-appliances-list  .content th {
+height:35px;
+}
+
+.view-id-uc_orders th a, 
+.view-id-uc_customers th a, 
+.view-id-sm_dashboard_sales th a,
+.view-id-product_item_management th a,
+#pid-admin-store-reports-stock .content th a, 
+#pid-admin-structure-taxonomy-all-appliances-list  .content th a{
+	color:#000;
+	font-weight:bold;
+	text-decoration:underline;
+}
+
+.view-id-uc_customers td.views-field-php{
+	width:250px;
+	float:left;
+}
+.page-admin-store-customers-view h1.title{
+margin-top:10px;
+}
+#pid-admin-structure-taxonomy-all-appliances-list #content-region-inner .action-links li{
+display:none;
+}
+
+.view-id-uc_customers{
+position:relative;
+}
+.view-id-uc_customers .view-header .external-access{
+    position: absolute;
+    right: 0;
+top: 30px;
+    background: #AAA;
+    color: #000;
+    padding: 5px 10px;
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.view-id-uc_orders{
+position:relative;
+}
+.view-id-uc_orders .view-header .external-access{
+    position: absolute;
+    right: 0;
+    top: 64px;
+    background: #AAA;
+    color: #000;
+    padding: 5px 10px;
+    font-weight: bold;
+    text-decoration: underline;
+}

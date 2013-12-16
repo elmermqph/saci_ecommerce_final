@@ -1,0 +1,39 @@
+#uc-cart-checkout-form #delivery-address-pane .form-type-textfield input{
+    background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#uc-cart-checkout-form #delivery-address-pane select{
+    background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 260px;
+}
+
+
+
+#uc-cart-checkout-form #edit-panes-billing-billing-street2 {
+    background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+.ui-dialog-titlebar{
+display: none;
+}
+
+#quotes-pane #quote.del_error {
+border: 3px solid red;
+}

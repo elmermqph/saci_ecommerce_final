@@ -1,0 +1,10 @@
+.node-teaser{
+display:none;
+}
+#block-system-main{
+display:none;
+}
+
+#block-block-12, #block-block-16, #block-block-19, #block-views-categories_product-block_1, #block-views-appliance_inner_category-block{
+display:none;
+}

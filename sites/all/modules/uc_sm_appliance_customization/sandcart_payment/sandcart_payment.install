@@ -1,0 +1,89 @@
+<?php
+
+/**
+* Implements hook_schema().
+*/
+function sandcart_payment_schema() {
+	$schema = array();
+	$schema['sandcart_payment_seq'] = array(
+		'description' => 'Sequencial',
+		'fields' => array(
+			'id' => array(
+				'description' => 'Primary key.',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'sandcart_date' => array(
+				'description' => 'Date.',
+				'type'     => 'varchar',
+				'length'   => 16,
+				'not null' => TRUE,
+				'default'  => '',
+			),
+			'sequence' => array(
+				'description' => 'Sequencial',
+				'type'     => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+				'default'  => 0,
+			),
+			'order_id' => array(
+				'description' => 'Order Id',
+				'type'     => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+				'default'  => 0,
+			),
+		),
+		'primary key' => array('id'),
+	);
+	
+	$schema['sandcart_payment_bdo'] = array(
+		'description' => 'Stores product information for BDO payment.',
+		'fields' => array(
+			'id' => array(
+				'description' => 'Primary key.',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'order_id' => array(
+				'description' => 'The order ID.',
+				'type'     => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+				'default'  => 0,
+			),
+			'bdo_date' => array(
+				'description' => 'Date',
+				'type'     => 'int',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+				'default'  => 0,
+			),
+			'bdo_cdv' => array(
+				'description' => 'CDV Number',
+				'type'     => 'varchar',
+				'length'   => 25,
+				'not null' => TRUE,
+				'default'  => '',
+			),
+		),
+		'primary key' => array('id'),
+	);
+	
+	return $schema;
+}
+
+/**
+* Implements hook_uninstall().
+*
+* Removes all tables and variables inserted into the
+* database by this module.
+*/
+function sandcart_payment_uninstall() {
+	db_delete('variable')
+	->condition('name', 'sandcart_payment_%', 'LIKE')
+	->execute();
+}

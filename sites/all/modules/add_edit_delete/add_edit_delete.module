@@ -1,0 +1,173 @@
+<?php
+
+
+/*
+ * Implement hook_permission
+ *
+ */
+function add_edit_delete_permission(){
+	return array(
+		'edit user' => array(
+			'title' => t('Edit User'),
+			'description' => 'Permission to edit user account',
+		),
+		'delete user' => array(
+			'title' => t('Delete User'),
+			'description' => 'Permission to delete user account',
+		),
+		
+		'add user' => array(
+			'title' => t('add User'),
+			'description' => 'Permission to add user account',
+		),
+	);
+}
+
+
+/*
+ * Implement hook_menu
+ *
+ */
+function add_edit_delete_menu(){
+	$items = array();
+	$items['add/user'] = array(
+		'title' => 'Add User', 
+		'page callback' => '_add_user',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('add user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/add.user.pages.inc',
+	);	
+	$items['user-update-by-admin/information'] = array(
+		'title' => 'Update User - Information', 
+		'page callback' => '_edituserbyadmin_information_user',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/edit.user.information.inc',
+	);	
+	$items['user-update-by-admin/account'] = array(
+		'title' => 'Add Dashboard User', 
+		'page callback' => '_edituserbyadmin_account_user',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/edit.user.account.inc',
+	);	
+	
+	
+	$items['user-update-by-admin/address'] = array(
+		'title' => 'Update User - Address', 
+		'page callback' => '_edituserbyadmin_address_user',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/edit.user.address.inc',
+	);
+	$items['update/%user'] = array(
+		'title' => 'Update User', 
+		'page callback' => '_update_user_x',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/update.user.inc',
+	);
+	$items['update1/%user'] = array(
+		'title' => 'User Profile', 
+		'page callback' => '_update1_user',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/update.user.page.inc',
+	);
+	
+	$items['dashboard/%user'] = array(
+		'title' => 'Update Dashboard User', 
+		'page callback' => '_update_dashboardx_user',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/update.dashbord.user.inc',
+	);
+	
+	
+	
+	$items['add/loyalty'] = array(
+		'title' => 'Add Loyalty', 
+		'page callback' => '_edituserbyadmin_add_smac',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/update.add.loyalty.inc',
+	);
+	$items['remove/loyalty'] = array(
+		'title' => 'Add Loyalty', 
+		'page callback' => '_edituserbyadmin_remove_smac',  // function to call the form
+		'access callback' => 'user_access',
+		'access arguments' => array('edit user'),
+		'type' => MENU_CALLBACK,
+		'file' => 'inc/update.add.loyalty.inc',
+	);
+	return $items;
+}
+
+function add_edit_delete_theme($existing, $type, $theme, $path) {
+  $theme = array(
+    'updateuser_template' => array(
+	  'render element' => 'element',
+      'template' => 'template/update-user-page',
+    ),
+  );
+  
+  return $theme;
+}
+
+function _add_country_options(){
+	$countryresult = db_query("SELECT country_id, country_name FROM uc_countries");
+	foreach ($countryresult as $option) {
+		$countryopt[$option->country_id] = $option->country_name;
+	}
+	return $countryopt;
+}
+
+function _add_country_options_prov($country){
+	$options = array();
+	$options = array(NULL => '--SELECT--');
+	$results = db_query("SELECT zone_id, zone_name FROM {uc_zones} WHERE zone_country_id = :countryid", array(':countryid' => $country));
+	foreach ($results as $option) {
+		$options[$option->zone_id] = $option->zone_name;
+	}
+	return $options;
+}
+
+function _add_edit_delete_mail($from = 'default_from', $to, $subject, $message) {
+  $my_module = 'add_edit_delete';
+  $my_mail_token = micuc_smappliancrotime();
+  if ($from == 'default_from') {
+    // Change this to your own default 'from' email address.
+    //$from = variable_get('system_mail', 'SM Appliance Center Inc.');
+	$from = variable_get('site_mail', ini_get('sendmail_from'));
+	//$from = 'test@test.com';
+  }
+  $message = array(
+    'id' => $my_module . '_' . $my_mail_token,
+    'to' => $to,
+    'subject' => $subject,
+    'body' => array($message),
+    'headers' => array(
+      'From' => $from,
+      'Sender' => $from,
+      'Return-Path' => $from,
+    ),
+  );
+  $system = drupal_mail_system($my_module, $my_mail_token);
+  $message = $system->format($message);
+  if ($system->mail($message)) {
+    return TRUE;
+  }
+  else {
+    return FALSE;
+  }
+}
+
+

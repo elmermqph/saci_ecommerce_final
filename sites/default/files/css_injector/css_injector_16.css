@@ -1,0 +1,14 @@
+#postscript-top {
+    background: none repeat scroll 0 0 #FEFEFE;
+    padding: 0px;
+    width: 950px;
+}
+#cart-form-pane {
+	background-color: #FEFEFE;
+	border-radius: 3px 3px 3px 3px;
+	float: left;
+	margin-bottom: 10px;
+	width:938px;
+	border:1px solid #BBD4EC;
+	/*padding:14px 0 0;*/
+}

@@ -1,0 +1,90 @@
+#footer-inner{
+padding: 0px 100px;
+width: 82%;
+}
+#footer-inner div.block{
+margin-bottom:0px;
+}
+#block-block-3{
+   width: 100%;
+}
+#block-menu-menu-legal {
+ width:133px;
+
+}
+#block-block-22 p{
+ margin:0px;
+}
+#block-views-e3d751b6673ac293dbddeb882d4f339e {
+width:160px;
+}
+
+
+#block-menu-menu-accounting-menu,
+#block-menu-menu-merchandising-menu,
+#block-menu-menu-operations-menu,
+#block-menu-menu-marketing-menu,
+#block-menu-menu-admin-menu,
+#block-menu-menu-order-dashboard,
+#block-menu-menu-catalogue-menu {
+	background: none repeat scroll 0 0 #00122E !important;
+    left: 0;
+    margin-bottom: 0;
+    position: absolute;
+    top: 0;
+    width: 281px;
+ z-index: 100;
+}
+
+#block-menu-menu-order-dashboard h2,
+#block-menu-menu-order-dashboard ul li a,
+#block-menu-menu-catalogue-menu h2,
+#block-menu-menu-catalogue-menu ul li a, 
+#block-menu-menu-accounting-menu h2,
+#block-menu-menu-accounting-menu ul li a, 
+#block-menu-menu-merchandising-menu h2,
+#block-menu-menu-merchandising-menu ul li a, 
+#block-menu-menu-operations-menu h2,
+#block-menu-menu-operations-menu ul li a, 
+#block-menu-menu-marketing-menu h2,
+#block-menu-menu-marketing-menu ul li a, 
+#block-menu-menu-admin-menu h2,
+#block-menu-menu-admin-menu ul li a
+{
+color:#fff;
+}
+#block-menu-menu-merchandising-menu ul li.nolink a{
+cursor:default;
+font-size: 14px;
+font-weight:bold;
+}
+#block-menu-menu-merchandising-menu ul li.nolink a:hover{
+text-decoration:none;
+}
+#block-menu-menu-merchandising-menu ul li.nolink ul li a{
+font-size: 12px;
+cursor:pointer;
+font-weight:normal;
+}
+#block-menu-menu-merchandising-menu ul li.nolink ul li a:hover{
+text-decoration:underline;
+}
+
+#pid-admin-store-orders-view #block-block-30{
+display:none;
+}
+.view-footer-menu ul li a{
+font-weight:normal;
+}
+.uc_out_of_stock_throbbing{
+display:none;
+}
+#pid-sku-update-check h1.title{
+margin-top: 20px;
+}
+
+.view-product-teaser-preview .views-field .field-content .container .body-description span.label{
+font-weight:bold;
+}
+.itemtable-fulldetails .view-content table td .views-field-field-on-sale-items span.container-No{display:none;}
+#pid-admin-store-reports-stock h1.title{margin-top:20px;}

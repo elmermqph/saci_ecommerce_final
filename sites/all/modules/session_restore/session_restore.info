@@ -1,0 +1,10 @@
+name = Session restore
+description = Restores session variables from the previous session when a user logs in.
+core = 7.x
+
+; Information added by drupal.org packaging script on 2011-09-03
+version = "7.x-1.0-alpha1"
+core = "7.x"
+project = "session_restore"
+datestamp = "1315069020"
+

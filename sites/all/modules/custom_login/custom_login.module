@@ -1,0 +1,298 @@
+<?php
+if(!defined("MMS_FILE_PATH_ROOT"))
+	define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
+function custom_login_menu() {
+	$items['password'] = array(
+		'title' => 'Request new password',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_user_pass'),
+		'access callback' => TRUE,
+		'type' => MENU_LOCAL_TASK,
+	);
+	$items['dashboard/login'] = array(
+		'title' => 'Dashborad Login',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_admin_form_login_form'),
+		'access callback' => 'user_is_anonymous',
+		'type' => MENU_LOCAL_TASK,
+	);
+	return $items;
+}
+
+function custom_login_block_info() {    
+  $blocks['custom_user_edit_form'] = array(
+    'info' => t('Custom Login Block'),
+  );
+  return $blocks;
+}
+
+function custom_login_block_view($delta = '') {
+	global $user;
+	switch ($delta) {
+	case 'custom_user_edit_form':
+		// Create your block content here
+		// For usability's sake, avoid showing two login forms on one page.
+		if (!$user->uid && !(arg(0) == 'user' && !is_numeric(arg(1)))) {
+			$block['subject'] = t('User login');
+			$block['content'] = drupal_get_form('_custom_login_edit_form');
+		}else{
+			$block['subject'] = t('User login');
+			$block['content'] = l(t('Logout'),'user/logout',array('attributes' => array('title' => t('Request new password via e-mail.'))));	 
+		}
+	}
+	return $block;
+}
+
+// http://lucky:8082/events/test-two drupal_get_destination()
+function _custom_login_edit_form($form){
+	$path = '/node/4029';
+	$form['#action'] = url(current_path(), array('query' => array('destination' => $path), 'external' => FALSE));
+	$form['#id'] = 'user-login-form';
+	$form['#validate'] = _user_login_default_validators();
+	$form['#submit'][] = 'user_login_submit';
+	$form['name'] = array('#type' => 'textfield',
+		'#title' => t('Username'),
+		'#maxlength' => USERNAME_MAX_LENGTH,
+		'#size' => 15,
+		'#required' => TRUE,
+		'#description' => 'Enter your SM Appliance Center username.',
+	);
+	$form['pass'] = array('#type' => 'password',
+		'#title' => t('Password'),
+		'#maxlength' => 60,
+		'#size' => 15,
+		'#required' => TRUE,
+		'#description' => 'Enter the password that accompanies your username.',
+	);
+	$form['actions'] = array('#type' => 'actions');
+	$form['actions']['submit'] = array('#type' => 'submit',
+		'#value' => t('Log in'),
+	);
+	// http://lucky:8082/content/redirect
+	// http://smappliance.spindev.ph/register
+	$items = array();
+	if (variable_get('user_register', USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL)) {
+		$items[] = l(t('Create an account'), 'content/redirect', array('attributes' => array('title' => t('Create a new user account.'))));
+	}
+	$items[] = l(t('Forgot password?'), 'password', array('attributes' => array('title' => t('Request new password via e-mail.'))));
+	$form['links'] = array('#markup' => theme('item_list', array('items' => $items)));
+	return $form;
+}
+
+
+
+/**
+ * Form builder; Request a password reset.
+ *
+ * @ingroup forms
+ * @see user_pass_validate()
+ * @see user_pass_submit()
+ */
+function _user_pass() {
+  global $user;
+	$form['additional'] = array(
+		'#markup' => '<h3 class="title gutter" style="margin: 0px;">Request new password</h3>',
+		'#attributes' => array('class' => array('message-status-wrapper')),
+	);
+  $form['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username or e-mail address.'),
+    '#size' => 60,
+    '#maxlength' => max(USERNAME_MAX_LENGTH, EMAIL_MAX_LENGTH),
+    '#required' => TRUE,
+  );
+  // Allow logged in users to request this also.
+  if ($user->uid > 0) {
+    $form['name']['#type'] = 'value';
+    $form['name']['#value'] = $user->mail;
+    $form['mail'] = array(
+      '#prefix' => '<p>',
+      '#markup' =>  t('Password reset instructions will be mailed to %email. You must log out to use the password reset link in the e-mail.', array('%email' => $user->mail)),
+      '#suffix' => '</p>',
+    );
+  }
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array('#type' => 'submit', '#value' => t('E-mail new password'));
+
+  return $form;
+}
+
+function _user_pass_validate($form, &$form_state) {
+  $name = trim($form_state['values']['name']);
+  // Try to load by email.
+  $users = user_load_multiple(array(), array('mail' => $name, 'status' => '1'));
+  $account = reset($users);
+  if (!$account) {
+    // No success, try to load by name.
+    $users = user_load_multiple(array(), array('name' => $name, 'status' => '1'));
+    $account = reset($users);
+  }
+  if (isset($account->uid)) {
+    form_set_value(array('#parents' => array('account')), $account, $form_state);
+  }
+  else {
+    form_set_error('name', t('Sorry, %name is not recognized as a user name or an e-mail address.', array('%name' => $name)));
+  }
+}
+
+function _user_pass_submit($form, &$form_state) {
+  global $language;
+
+  $account = $form_state['values']['account'];
+  // Mail one time login URL and instructions using current language.
+  $mail = _user_mail_notify('password_reset', $account, $language);
+  if (!empty($mail)) {
+    watchdog('user', 'Password reset instructions mailed to %name at %email.', array('%name' => $account->name, '%email' => $account->mail));
+    drupal_set_message(t('Further instructions have been sent to your e-mail address.'));
+  }
+// http://lucky:8082/content/custom-login?width=500&height=500&iframe=true
+  $form_state['redirect'] = 'content/custom-login';
+  return;
+}
+
+
+function custom_login_mail($key, &$message, $params){
+	$langcode = isset($message['language']) ? $message['language']->language : NULL;
+	// Build the appropriate message paramaters based on the e-mail key.
+	switch ($key) {
+		case 'resend-invoice':{
+			$oid = $params['oid'];
+			$attachment = array(
+				'filecontent' => file_attachment_path($oid),
+				// 'filename' => $oid.'test.txt',
+				'filemime' => 'application/pdf',
+			); 
+			// $subject = isset($params['order']['order_id']) ? $params['order']['order_id'] : 'Test';
+			$message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+			$message['subject'] = t('Your Order at SM Appliance Center', array(), array('langcode' => $langcode));
+			$message['from'] = uc_store_email_from();
+			$message['body'][] = theme('uc_order', array('order' => $params['order'], 'op' => 'admin-mail', 'template' => variable_get('uc_cust_order_invoice_template', 'customer')));
+			$message['params']['attachments'][] = $attachment;
+			break;
+		}
+		case 'bdo-invoice':
+			$oid = $params['oid'];
+			$attachment = array(
+				'filecontent' => MMS_FILE_PATH_ROOT.file_attachment_path($oid),
+				// 'filename' => $oid.'test.txt',
+				'filemime' => 'application/pdf',
+			); 
+			// $subject = isset($params['order']['order_id']) ? $params['order']['order_id'] : 'Test';
+			$message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+			$message['subject'] = t('Your Order at SM Appliance Center', array(), array('langcode' => $langcode));
+			$message['from'] = uc_store_email_from();
+			$message['body'][] = theme('uc_order', array('order' => $params['order'], 'op' => 'admin-mail', 'template' => variable_get('uc_cust_order_invoice_template', 'customer')));
+			$message['params']['attachments'][] = $attachment;
+		break;
+		case 'invoice' :{
+			$message['subject'] = t('Your Sales Invoice', array(), array('langcode' => $langcode));
+			break;
+		}
+		case 'thres':{
+			$message['headers']['Content-Type'] = 'text/html; charset=UTF-8; format=flowed';
+			// $message['subject'] = t('Your Order at SM Appliance Center', array(), array('langcode' => $langcode));
+			$message['subject'] = $params['subject'];
+			$message['body'][] = $params['body'];
+			$message['from'] = uc_store_email_from();
+			break;
+		}
+	}
+}
+
+
+function _user_login_default_validators() {
+  return array('_user_login_name_validate', 'user_login_authenticate_validate', '_user_login_final_validate');
+}
+
+function _user_login_name_validate($form, &$form_state) {
+  if (isset($form_state['values']['name']) && user_is_blocked($form_state['values']['name'])) {
+    // Blocked in user administration.
+    form_set_error('name', t('The username %name has not been activated or is blocked.', array('%name' => $form_state['values']['name'])));
+  }
+  
+  if(user_not_validate($form_state['values']['name']) == "not validated"){
+	// form_set_error('name', t('The username %name has not been validated.', array('%name' => $form_state['values']['name'])));
+	form_set_error('name', t('Activate your account first before you login.'));
+  }
+}
+
+function user_not_validate($name){
+	$userex = user_load_by_name($name);
+	if(!empty($userex->roles[5])){
+		return "not validated";
+	}else{
+		if(!empty($userex->roles[6])){
+			return "not validated";
+		}else{
+			return "registered";
+		}
+	}
+}
+
+
+function _user_login_final_validate($form, &$form_state) {
+  if (empty($form_state['uid'])) {
+    // Always register an IP-based failed login event.
+    flood_register_event('failed_login_attempt_ip', variable_get('user_failed_login_ip_window', 3600));
+    // Register a per-user failed login event.
+    if (isset($form_state['flood_control_user_identifier'])) {
+      flood_register_event('failed_login_attempt_user', variable_get('user_failed_login_user_window', 21600), $form_state['flood_control_user_identifier']);
+    }
+
+    if (isset($form_state['flood_control_triggered'])) {
+      if ($form_state['flood_control_triggered'] == 'user') {
+        form_set_error('name', format_plural(variable_get('user_failed_login_user_limit', 5), 'Sorry, there has been more than one failed login attempt for this account. It is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', 'Sorry, there have been more than @count failed login attempts for this account. It is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', array('@url' => url('user/password'))));
+      }
+      else {
+        // We did not find a uid, so the limit is IP-based.
+        form_set_error('name', t('Sorry, too many failed login attempts from your IP address. This IP address is temporarily blocked. Try again later or <a href="@url">request a new password</a>.', array('@url' => url('user/password'))));
+      }
+    }
+    else {
+      form_set_error('name', t('Sorry, unrecognized username or password. <a href="@password">Have you forgotten your password?</a>', array('@password' => url('password'))));
+      watchdog('user', 'Login attempt failed for %user.', array('%user' => $form_state['values']['name']));
+    }
+  }
+  elseif (isset($form_state['flood_control_user_identifier'])) {
+    // Clear past failures for this user so as not to block a user who might
+    // log in and out more than once in an hour.
+    flood_clear_event('failed_login_attempt_user', $form_state['flood_control_user_identifier']);
+  }
+}
+
+
+
+function _admin_form_login_form($form){
+	  global $user;
+	  drupal_set_title('Dashboard Login');
+
+	// If we are already logged on, go to the user page instead.
+//	if ($user->uid) {
+//		drupal_goto('my-account');
+//	}
+	
+	$form['#action'] = url(current_path(), array('query' => drupal_get_destination(), 'external' => FALSE));
+	$form['#id'] = 'admin-user-login-form';
+	$form['#validate'] = user_login_default_validators();
+	$form['#submit'][] = 'user_login_submit';
+	
+	// Display login form:
+	$form['name'] = array('#type' => 'textfield',
+	'#title' => t('Username'),
+	'#size' => 60,
+	'#maxlength' => 100,
+	'#required' => TRUE,
+	);
+	
+	$form['name']['#description'] = t('Enter your @s username.', array('@s' => variable_get('site_name', 'Drupal')));
+	$form['pass'] = array('#type' => 'password',
+	'#title' => t('Password'),
+	'#description' => t('Enter the password that accompanies your username.'),
+	'#required' => TRUE,
+	);
+	$form['#validate'] = user_login_default_validators();
+	$form['actions'] = array('#type' => 'actions');
+	$form['actions']['submit'] = array('#type' => 'submit', '#value' => t('Log in'));
+	
+	return $form;
+}

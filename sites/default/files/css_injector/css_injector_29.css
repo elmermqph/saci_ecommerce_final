@@ -1,0 +1,507 @@
+#-edit-account-form{
+	width:500px;
+}
+
+#-edit-account-form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+
+#-edit-account-form #edit-acc-active label{
+	float: none;
+    width: 50px;
+}
+
+#-edit-account-form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#-edit-account-form .form-item-acc-dateob .description{
+	color: red;
+    float: left;
+    margin-bottom: 10px;
+    margin-top: -10px;
+    padding-left: 118px;
+    width: 100%;
+}
+
+#-edit-account-form .form-item-acc-active{
+	float:left;
+	width:100%;
+}
+
+#-edit-account-form .form-item-acc-active .form-item-acc-active{
+	float:left;
+	width:75px;
+}
+
+#-edit-account-form .form-item-acc-active label{
+	padding-top: 8px;
+}
+
+#-edit-account-form #edit-x-submit{
+	float: left;
+    margin-right: 100px;
+}
+
+
+
+
+
+/*login details*/
+#-edit-login-details-form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+#-edit-login-details-form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#edit-name.form-text,
+#edit-mail.form-text{
+	margin-bottom: 0 !important;
+}
+
+
+.form-type-password-confirm .description{
+	margin-top: 5px;
+}
+
+
+#-edit-login-details-form  .form-type-textfield{
+	float: left;
+    width: 100%;
+	margin: 0;
+}
+
+#-edit-login-details-form .password-strength{
+	float: left;
+    margin-left: 121px;
+    margin-top: 1.7em;
+    position: fixed !important;
+    width: 17em;
+}
+#-edit-login-details-form .password-parent{
+	margin-bottom: 50px;
+}
+
+#-edit-login-details-form .form-item-pass-pass2{
+	float: left;
+    width: 100%;
+}
+
+#-edit-login-details-form .password-suggestions.description{
+	display:none !important;
+}
+
+#-edit-login-details-form div.password-confirm{
+	float: left;
+    margin-left: 120px;
+    margin-top: 25px;
+    position: absolute;
+    width: 17em;
+}
+
+
+/*------[Address]----------*/
+#-edit-userbyadmin-address-form label,
+#-edit-address-details-form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+#-edit-userbyadmin-address-form .form-text,
+#-edit-address-details-form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#-edit-userbyadmin-address-form #edit-add-country,
+#-edit-address-details-form #edit-add-country{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 0 1px; 
+    padding: 3px;
+    width: 257px;
+}
+#-edit-userbyadmin-address-form .form-type-textfield,
+#-edit-userbyadmin-address-form .form-type-select,
+#-edit-address-details-form .form-type-textfield,
+#-edit-address-details-form .form-type-select{
+	float: left;
+    width: 100%;
+	margin: 0;
+}
+
+#-edit-userbyadmin-address-form #edit-submit,
+#-edit-address-details-form #edit-submit{
+	margin-right:100px;
+	float:left;
+}
+
+
+#-add-smac-form .form-type-textfield,
+#-edit-smac-form .form-type-textfield{
+	float: left;
+	width: 20px;
+}
+#-add-smac-form .form-type-textfield input,
+#-edit-smac-form .form-type-textfield input{
+	text-align: center;
+    width: 15px;
+}
+
+#-add-smac-form,
+#-edit-smac-form{
+	width: 500px;
+}
+
+#m-one,
+#m-two,
+#m-three{
+	float: left;
+    margin-top: 12px;
+    padding: 0 2px;
+}
+
+#edit-clear{
+background: none repeat scroll 0 0 transparent;
+    border: medium none;
+    color: #59B3DC;
+    font-size: 11px;
+    font-weight: lighter;
+}
+
+#edit-validate-card{
+	margin-top: 13px;
+}
+
+#edit-submit{
+	margin-right: 131px;
+}
+
+#-edit-address-details-form{
+width: 408px;
+}
+
+#textfields{
+float: left;
+height:128px;
+}
+
+#textfields fieldset{
+padding: 0;
+border: medium none;
+}
+
+#textfields select{
+margin: 0 5px 8px 1px;
+}
+
+#-edit-userbyadmin-address-form #textfields select{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 8px 1px;
+    padding: 3px;
+    width: 257px;
+}
+
+
+.ie8 #-edit-userbyadmin-address-form #textfields fieldset,
+.ie8 #-edit-address-details-form #textfields fieldset {
+width: 400px;
+}
+
+.ie8 #-edit-login-details-form .form-item-pass-pass2,
+.chrome #-edit-login-details-form .form-item-pass-pass2{
+margin-top: 12px !important;
+}
+
+#pid-edit-user-account-details div.content-messages-inner div.error{
+	height: auto !important;
+}
+
+
+#-edit-account-form{
+	width:500px;
+}
+
+#-edit-account-form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+
+#-edit-account-form #edit-acc-active label{
+	float: none;
+    width: 50px;
+}
+
+#-edit-account-form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#-edit-account-form .form-item-acc-dateob .description{
+	color: red;
+    float: left;
+    margin-bottom: 10px;
+    margin-top: -10px;
+    padding-left: 118px;
+    width: 100%;
+}
+
+#-edit-account-form .form-item-acc-active{
+	float:left;
+	width:100%;
+}
+
+#-edit-account-form .form-item-acc-active .form-item-acc-active{
+	float:left;
+	width:75px;
+}
+
+#-edit-account-form .form-item-acc-active label{
+	padding-top: 8px;
+}
+
+#-edit-account-form #edit-x-submit{
+	float: left;
+    margin-right: 100px;
+}
+
+
+
+
+
+/*login details*/
+#edit-byadmin-account-form,
+#-edit-login-details-form{
+	width: 420px;
+}
+
+#edit-byadmin-account-form label,
+#-edit-login-details-form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+#edit-byadmin-account-form .form-text,
+#-edit-login-details-form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    padding: 3px;
+    width: 250px;
+}
+
+#-edit-login-details-form #edit-current-pass{
+	margin-bottom: 10px;
+}
+
+#-edit-login-details-form  .form-type-textfield{
+	float: left;
+    width: 100%;
+	margin: 0;
+}
+
+#edit-byadmin-account-form .password-strength,
+#-edit-login-details-form .password-strength{
+	float: left;
+    margin-left: 121px;
+    margin-top: 1.7em;
+    position: fixed;
+    width: 17em;
+}
+#-edit-login-details-form .password-parent{
+	margin-bottom: 50px;
+}
+
+#-edit-login-details-form .form-item-pass-pass2{
+	float: left;
+    width: 100%;
+}
+
+#-edit-login-details-form .password-suggestions.description{
+	display:none !important;
+}
+
+#edit-byadmin-account-form div.password-confirm,
+#-edit-login-details-form div.password-confirm{
+	float: left;
+    margin-left: 120px;
+    margin-top: 25px;
+    position: absolute;
+    width: 17em;
+}
+
+
+/*------[Address]----------*/
+#pid-edit-user-address-details form label{
+	float: left;
+    font-weight: normal;
+    width: 120px;
+}
+#pid-edit-user-address-details form .form-text{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 0;
+    padding: 3px;
+    width: 250px;
+}
+
+#pid-edit-user-address-details form select{
+	background-color: #F6F6F6;
+    border: 1px solid #CCCCCC;
+    border-radius: 5px 5px 5px 5px;
+    float: left;
+    margin: 0 5px 12px 1px; 
+    padding: 3px;
+    width: 257px;
+}
+
+#pid-edit-user-address-details form .form-type-textfield,
+#pid-edit-user-address-details form .form-type-select{
+	float: left;
+    width: 100%;
+	margin: 0;
+}
+
+#pid-edit-user-address-details form #edit-submit{
+	margin-right:100px;
+	float:left;
+}
+#-add-smac-form .form-type-textfield,
+#-edit-smac-form .form-type-textfield{
+	float: left;
+	width: 20px;
+}
+#-add-smac-form .form-type-textfield input,
+#-edit-smac-form .form-type-textfield input{
+	text-align: center;
+    width: 15px;
+}
+
+#-add-smac-form,
+#-edit-smac-form{
+	width: 500px;
+}
+
+#m-one,
+#m-two,
+#m-three{
+	float: left;
+    margin-top: 12px;
+    padding: 0 2px;
+}
+
+#edit-clear{
+background: none repeat scroll 0 0 transparent;
+    border: medium none;
+    color: #59B3DC;
+    font-size: 11px;
+    font-weight: lighter;
+}
+
+#edit-validate-card{
+	margin-top: 13px;
+}
+
+#edit-submit{
+	margin-right: 131px;
+}
+
+.form-item-add-country {
+height: 26px;
+}
+
+
+.ie8 #textfields fieldset{
+width: 400px;
+}
+#-edit-account-form #edit-faxno,
+#-edit-account-form #edit-telephone{
+margin-bottom: 0;
+}
+
+#-edit-account-form .form-item-faxno .description,
+#-edit-account-form .form-item-telephone .description{
+float: left;
+margin: 0 120px 10px;
+color: red;
+font-size: 12px;
+width: 200px;
+}
+
+#edit-byadmin-account-form .form-item .description{
+    color: #888888;
+    float: left;
+    font-size: 10px;
+    font-style: italic;
+    margin-left: 120px;
+}
+
+.page-update1 #breadcrumbs{
+display: block;
+}
+.page-update1 #breadcrumbs a{
+display: none;
+}
+
+#edit-byadmin-account-form .form-item-pass-pass1,
+#edit-byadmin-account-form .form-item-pass-pass2{
+	height: 43px;
+}
+
+#user-register-form .password-strength,
+#edit-byadmin-account-form .password-strength{
+	position:absolute !important;
+}
+
+#user-register-form .form-text,
+#edit-byadmin-account-form .form-text{
+	margin-bottom:10px;
+}
+
+
+.page-update #edit-xrole .form-item-xrole-7, 
+.page-update #edit-xrole .form-item-xrole-8, 
+.page-update #edit-xrole .form-item-xrole-9, 
+.page-update #edit-xrole .form-item-xrole-10, 
+.page-update #edit-xrole .form-item-xrole-11, 
+.page-update #edit-xrole .form-item-xrole-12, 
+.page-update #edit-xrole .form-item-xrole-13, 
+.page-update #edit-xrole .form-item-xrole-14{
+	padding-left:0 !important;
+}

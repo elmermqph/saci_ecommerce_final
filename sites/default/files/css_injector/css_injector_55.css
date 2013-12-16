@@ -1,0 +1,9 @@
+.ie  #custom-xend-text{
+display: block;
+margin-top: 10px;
+}
+
+.ie9  #custom-xend-text{
+display: block;
+margin-top: 10px;
+}

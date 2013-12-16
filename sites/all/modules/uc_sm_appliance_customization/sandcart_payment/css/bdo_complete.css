@@ -1,0 +1,6 @@
+#block-system-main{
+	width: 100%;
+}
+#breadcrumbs.breadcrumbs.block{
+	display: block !important;
+}

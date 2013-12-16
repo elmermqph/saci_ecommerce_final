@@ -1,0 +1,8 @@
+
+#Clean my /home/smmci_apache from smacdeals cron junk
+echo "Hello World! It is $(date +"%b-%d-%y %I:%M:%S")"
+
+echo "I'll clean my home from smacdeals cron junk"
+
+rm -f /home/smmci_apache/itemmasterfile*
+

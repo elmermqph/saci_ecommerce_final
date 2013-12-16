@@ -1,0 +1,33 @@
+<?php
+/**
+ * @file
+ * Testing module.
+ */
+
+/**
+ * Implements hook_rules_plugin_info().
+ */
+function rules_conditional_test_rules_plugin_info() {
+  return array(
+    'stub conditional' => array(
+      'label' => 'Stub conditional',
+      'class' => 'RulesConditionalTestStubPlugin',
+      'embeddable' => 'RulesActionContainer',
+      'extenders' => array(
+        'RulesPluginUIInterface' => array(
+          'class' => 'RulesPluginUI',
+        ),
+      ),
+    ),
+    'stub conditional branch' => array(
+      'label' => 'Stub conditional branch',
+      'class' => 'RulesConditionalTestStubBranchPlugin',
+      'embeddable' => 'RulesActionContainer',
+      'extenders' => array(
+        'RulesPluginUIInterface' => array(
+          'class' => 'RulesPluginUI',
+        ),
+      ),
+    ),
+  );
+}

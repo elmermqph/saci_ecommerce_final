@@ -1,0 +1,37 @@
+.remove-item-link{
+background: #fff;
+    border: 0 none;
+    color: #59B3DC;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: normal;
+     /*margin-left: -58px;*/
+    margin-top: 2px;
+    padding: 0 2px 2px;
+    /*position: absolute;*/
+    text-decoration: underline;
+    z-index: 100;
+}
+.chrome .remove-item-link {
+	left: 76px;
+}
+.ie8 .remove-item-link{
+   margin-left: 0px;
+   margin-top:3px;
+}
+.ie9 .remove-item-link{
+   margin-left: 0px;
+   margin-top:3px;
+}
+#uc-cart-view-form td.remove .form-submit{
+display:none;
+}
+.remove{
+width: 81px;
+}
+#cart-form-pane td.qty .form-required{
+display:none;
+}
+#cart-form-pane td{
+position:relative;
+}

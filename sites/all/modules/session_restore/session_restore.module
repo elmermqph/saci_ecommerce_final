@@ -1,0 +1,94 @@
+<?php
+
+/**
+ * @file
+ *   Restore previously stored sessions upon login.
+ *
+ * @author
+ *   Karthik Kumar / Zen [ http://drupal.org/user/21209 ].
+ */
+
+/**
+ * Implements hook_user_login().
+ */
+function session_restore_user_login(&$edit, $account) {
+  if (isset($account->uid) && $account->uid) {
+    _session_restore_session_get($account->uid);
+  }
+}
+
+/**
+ * Implements hook_user_delete().
+ */
+function session_restore_user_delete($account) {
+  db_delete('session_restore')
+    ->condition('uid', $account->uid)
+    ->execute();
+}
+
+/**
+ * Implements hook_exit().
+ */
+function session_restore_exit() {
+  _session_restore_session_set();
+}
+
+/**
+ * Remove unnecessary variables and return a serialized session array.
+ *
+ * @param $session
+ *   The session to vet.
+ *
+ * @return
+ *   Cleaned-up session array ready for storage.
+ */
+function _session_restore_vet($session) {
+  // Unset variables that might break this or other modules upon restore.
+  $variables = module_invoke_all('session_restore');
+
+  foreach ($variables as $variable) {
+    unset($session[$variable]);
+  }
+
+  return $session;
+}
+
+/**
+ * Retrieve stored session if available.
+ *
+ * @param $uid
+ *   The user ID of the user whose session is to be retrieved.
+ */
+function _session_restore_session_get($uid) {
+  $session = db_query("SELECT session FROM {session_restore}
+    WHERE uid = :uid", array(':uid' => $uid))
+    ->fetchField();
+  // Manually merge old values with potential new entries set during login by a
+  // module introduced when the user was logged out.
+  if ($session) {
+    $session = unserialize($session);
+    foreach ($session as $key => $value) {
+      $_SESSION[$key] = $value;
+    }
+  }
+}
+
+/**
+ * Store the current session if available.
+ */
+function _session_restore_session_set() {
+  global $user;
+
+  if ($user->uid) {
+    db_delete('session_restore')
+      ->condition('uid', $user->uid)
+      ->execute();
+    $session = _session_restore_vet($_SESSION);
+    if (!empty($session)) {
+      // Serialize session and store.
+      db_insert('session_restore')
+        ->fields(array('uid' => $user->uid, 'session' => serialize($session)))
+        ->execute();
+    }
+  }
+}

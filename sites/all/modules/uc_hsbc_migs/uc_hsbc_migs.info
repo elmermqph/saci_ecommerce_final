@@ -1,0 +1,11 @@
+name = HSBC MIGS Payment Gateway
+description = Integration for HSBC MIGS 3-Party VPC.
+dependencies[] = uc_cart
+dependencies[] = uc_payment
+package = Ubercart - payment
+core = 7.x
+configure = admin/store/settings/payment/method/hsbc_migs
+
+; Views handlers
+files[] = uc_hsbc_migs_handler_field_status_id.inc
+files[] = uc_hsbc_migs_handler_field_status_title.inc

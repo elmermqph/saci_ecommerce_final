@@ -1,0 +1,3 @@
+name = MMS generator
+description = SM Appliance xml mms custom module
+core = 7.x 

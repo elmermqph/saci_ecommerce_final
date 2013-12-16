@@ -1,0 +1,73 @@
+#pid-cart-checkout #block-system-main {
+	width: 465px !important;
+}
+#pid-cart-checkout td.products a {
+	color: #000;
+}
+#pid-cart-checkout #block-block-14 {
+	margin-left: 0;
+}
+#pid-cart-checkout #uc-cart-checkout-form .form-submit {
+	background: url("/sites/all/themes/fusion/sm_appliance/images/blue-button.jpg") repeat scroll 0 0 transparent;
+	border: 1px solid #009BFF;
+	border-radius: 5px 5px 5px 5px;
+	color: #FFFFFF;
+	cursor: pointer;
+	font-weight: normal;
+	height: 24px;
+	text-transform: uppercase;
+}
+#cboxContent #block-system-main {
+	width: 260px !important
+}
+.classinput-txt {
+	background-color: #F6F6F6;
+	border: 1px solid #CCC;
+	border-radius: 5px 5px 5px 5px;
+	float: left;
+	margin: 0 5px 12px 0;
+	padding: 3px;
+	width: 250px;
+}
+#billing-address-pane #edit-panes-billing-address input {
+	background-color: #C0C0C0;
+	color: grey;
+}
+#edit-panes-billing-billing-country, #edit-panes-billing-billing-zone, #edit-panes-delivery-delivery-city {
+	/*display: none;*/
+}
+#uc-cart-checkout-form .form-item-panes-billing-select-address, #uc-cart-checkout-form .form-item-panes-delivery-select-address {
+	display: none !important;
+}
+/*.uc-cart-checkout-form .form-item-panes-delivery-copy-address{
+display:none;
+}*/
+
+#addc {
+	float: right;
+}
+#popupcontainerdisplay {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	background: #000;
+	z-index: 998;
+	opacity: 0.8;
+	filter: alpha(opacity=80);
+	-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=80)";
+}
+#edit-panes-billing-address .form-item label span.form-required, .form-item-panes-delivery-delivery-country label span.form-required {
+	display: none;
+}
+#quotes-pane {
+	color: #3CB3F8;
+}
+#quotes-pane .fieldset-description, #quotes-pane #quote {
+	color: #333;
+}
+#quotes-pane .fieldset-wrapper .fieldset-description {
+	margin-top: 17px;
+}
+#uc-cart-checkout-form #delivery-pane .error ul li{
+list-style:none;
+}

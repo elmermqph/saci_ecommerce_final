@@ -1,0 +1,1199 @@
+<?php 
+
+define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
+define("EMAIL_NOTIFY","p.ferrer@spinweb.ph,ecd@mci.com.ph,jyc@mci.com.ph,elcyn.cubillan@gmail.com,rad@mci.com.ph,Shirley.D.Lim@sm-shoemart.com");
+//define("EMAIL_NOTIFY","p.ferrer@spinweb.ph,e.quilala@spinweb.ph");
+
+function generate_day_cron_check(){
+	$filepath =   MMS_FILE_PATH_ROOT."sites/default/files/mms_path/";
+	$filesystemcheck = array();
+	$filesystemcheck = array('item'=>array(),'ean'=>array(),'itemprice'=>array(),'itemdescr'=>array());
+	if ($handle = opendir($filepath)) {
+		while (false !== ($file = readdir($handle))) { 
+			if ($file != "." && $file != "..") {
+				if(file_exists($filepath.$file)){
+					if(strpos($file,".crc")>0){
+						unlink($filepath.$file);
+					}else if(strpos($file,".txt")>0 || strpos($file,".TXT")>0){
+						$str = substr($file,0,2);
+						if($str=="sa"){
+							$filesystemcheck['tkstore'] = $filepath.$file;
+						}else{
+							$filesystemcheck['qtyupdate'] = $filepath.$file;
+						}
+					}else{
+						$str = substr($file,0,2);
+						if($str=="ID" || $str=="IF"){
+							$filesystemcheck['item'][] = $filepath.$file;
+							$filesystemcheck['ean'][] = $filepath.$file;
+						}else if($str=="UF"){
+							$filesystemcheck['itemprice'][] = $filepath.$file;
+							$filesystemcheck['itemdescr'][] = $filepath.$file;
+						}
+					}
+				}else{
+					return  MMS_FILE_PATH_ROOT."sites/default/files/mms_path/";
+				}
+			}
+		}
+	}
+	closedir($handle); 
+	$arraynatureorder = array('item','ean','itemprice','itemdescr','tkstore','qtyupdate');
+	foreach($arraynatureorder as $value){
+		if(isset($filesystemcheck[$value])){
+			$ordervalue[$value] = $filesystemcheck[$value];
+		}
+	}
+	//return $ordervalue;
+	return generate_mms_form($ordervalue);
+	
+	
+}
+
+function generate_mms_form($arraypath){
+	require_once("object/classoutput.php");
+	$object = new MMS_CLASS;
+	$return = $object->file_save_to_server($arraypath);
+	if($return==TRUE){
+		foreach ($arraypath as $value){
+			if(is_array ($value)){
+				foreach($value as $subvalue)
+					unlink($subvalue);
+			
+			}else{
+				unlink($value);
+			}
+		}
+	}
+	return true;
+}
+
+function transfer_file($arraypath){
+	require_once("object/classoutput.php");
+	$object = new MMS_CLASS;
+	
+	
+	$filepath =  MMS_FILE_PATH_ROOT;
+	$storageinboundfile = "inbound/";
+	$tempstorage = "/sites/default/files/mms_path";
+	$ziptempstorage = "/sites/default/files/temp_xml";
+	$daybefore =  strtotime("-1day");
+	switch($arraypath){
+		case "itemmasterfile":
+			$casezip = "ID0370423".date("mdy",$daybefore).".zip";
+			$filetype = "zip";
+		break;
+		case "skuupdate":
+			$casezip = "IF0370423".date("mdy",$daybefore).".zip";
+			$filetype = "zip";
+		break;
+		case "tkstore":
+			$casezip = "sacistore".date("mdy",$daybefore);
+			$filetype = "txt";
+		break;
+		case "transfile":
+			$casezip = "0370423".date("mdY",$daybefore);
+			$filetype = "txt";
+		break;
+		
+		
+	}
+	switch($filetype){
+		case "zip":
+			$zip = new ZipArchive;
+			$res = $zip->open($filepath.$storageinboundfile.$casezip);
+			if ($res === TRUE) {
+				$zip->extractTo($filepath.$ziptempstorage);
+				$zip->close();
+				
+				if($object->convert_xml() =="TRUE")
+					$returnvalue = 'DONE';
+				else
+					$returnvalue = 'FAILED';
+				
+				} else {
+				$returnvalue = 'FAILED';
+			}
+		break;
+		case "txt":
+			if(file_exists($filepath.$storageinboundfile.$casezip.".TXT"))
+				$extension = ".TXT";
+			else
+				$extension = ".txt";
+				
+			if (copy($filepath.$storageinboundfile.$casezip.$extension , $filepath.$tempstorage."/".$casezip.$extension)) {
+				$returnvalue = 'DONE';
+			}else{
+				$returnvalue = 'FAILED';
+			}
+		break;
+		
+	}
+	//$filepath.$storageinboundfile.$casezip
+	return $returnvalue;
+	//return $filepath ;
+}
+
+
+function csa_daily_sales(){
+	$filepath = MMS_FILE_PATH_ROOT."outbound/sales_file/";
+	require_once("object/classoutput.php");
+	$object = new MMS_CLASS;
+	
+	$filesystemcheck = array();
+	if ($handle = opendir($filepath)) {
+		while (false !== ($file = readdir($handle))) { 
+			if ($file != "." && $file != "..") {
+				if(file_exists($filepath."\\".$file)){
+					$filesystemcheck = array_merge($filesystemcheck,array($filepath.$file));
+				}else{
+					return "failed";
+				}
+				
+				
+			}
+		}
+	}
+	closedir($handle); 
+	$zipfile = $filepath."S10370423.".date("mdy").".zip";
+	return $object->zip_file_compressor($filesystemcheck,$zipfile,true,$filepath);
+}
+
+function csa_file_name($csafilename,$datenow,$cron="",$checksmoutbound=""){
+	require_once("object/classoutput.php");
+	$object = new MMS_CLASS;
+	global $base_root;
+	$filepath = MMS_FILE_PATH_ROOT."outbound/zip_file/";
+	$tempcsvfilepath = MMS_FILE_PATH_ROOT."outbound/csa/csv/";
+	
+	
+	$zipfile = $filepath.$csafilename.".zip";
+	
+	
+	if($cron!=""){
+		$parameteraddcron = "&typecron_check=1";
+	}else{
+		$parameteraddcron = "";
+	}
+	
+	if(file_exists($zipfile)){
+		unlink($zipfile);
+	}
+	
+	if(file_exists($tempcsvfilepath.$csafilename.".csv")){
+		unlink($tempcsvfilepath.$csafilename.".csv");
+	}
+	if(file_put_contents($tempcsvfilepath.$csafilename.".csv",file_get_contents($base_root."/csa_report_fetch.csv?created%5Bvalue%5D%5Bdate%5D=".$datenow.$parameteraddcron))){
+		$filesystemcheck = array($tempcsvfilepath.$csafilename.".csv");
+		$object->zip_file_compressor($filesystemcheck,$zipfile,true,$tempcsvfilepath);
+		if(file_exists($zipfile)){
+			
+			if($cron!=""){
+				if($checksmoutbound!=""){
+					$ftp_server = "10.101.1.98"; 
+					$ftp_user_name = "saciftp";
+					$ftp_user_pass = "saciftp";
+					$file = $zipfile;
+					$fp = fopen($file, 'r');
+					$conn_id = ftp_connect($ftp_server);
+					$login_result = ftp_login($conn_id, $ftp_user_name, $ftp_user_pass);
+					if(ftp_fput($conn_id, "ftp/".$csafilename.".zip", $fp, FTP_BINARY)){
+						ftp_close($conn_id);
+						fclose($fp);
+						watchdog( 'cron', 'Cron file transfer in !cronftp Success.', array('!cronftp' => l('Outbound CSA')), WATCHDOG_NOTICE);
+						if(unlink($tempcsvfilepath.$csafilename.".csv")){
+							return "Complete";
+						}else{
+							return "Failed Compress";
+						}
+					}else{
+						ftp_close($conn_id);
+						fclose($fp);
+						$nid = db_insert('z_report_logs')->fields(array(
+							'filename' => $zipfile,
+							'start_datetime' => 0,
+							'end_datetime' => 0,
+							'totalcount'=>0,
+							'totalamount'=>0,
+							'batchamount'=>0,
+							'nooftrx'=>0,
+							'totaltrxammount'=>0,
+							'notrxlines'=>0,
+							'status_logs'=>0
+						))->execute();
+						watchdog( 'cron', 'Cron file transfer in !cronftp Failed.', array('!cronftp' => l('Outbound CSA')), WATCHDOG_WARNING);
+						if($nid)
+							return "Failed Transfer";
+					}
+				}else{
+					return "Complete";
+				}
+			}else{
+				if(unlink($tempcsvfilepath.$csafilename.".csv")){
+					return "Complete";
+				}else{
+					return "Failed Compress";
+				}
+			}
+		}
+	}else{
+		return "Convert File Failed";
+	}
+}
+
+function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
+	global $base_root;
+	$filenamecheck = "C0370423".date("mdy",strtotime($dateformat))."1";
+	$view = views_get_view('order_productlist'); 
+	$view->set_display('page_validation_result'); 
+	$view->exposed_input['created']['value']['date'] = $dateformat;
+	$view->pre_execute();
+	$view->render();
+	$statusreturn = array();
+	$completegeneratereport = false;
+	while($completegeneratereport == false){
+		if(count($view->result)>0){
+			$statusprint =  csa_file_name($filenamecheck,$dateformat,$cron,$checksmoutbound);
+			if($statusprint=="Complete"){
+				if(file_exists($_SERVER['DOCUMENT_ROOT']."/outbound/zip_file/".$filenamecheck.".zip")){
+					$statusreturn['status'] = "Complete";
+					$statusreturn['path']  = $base_root."/outbound/zip_file/".$filenamecheck.".zip";
+				}else{
+					$statusreturn['status'] =  "File Not Found";
+				}
+			}else{
+				$statusreturn['status'] = "failed due to :".$statusprint ; 
+			}
+			$completegeneratereport = true;
+		}else if(count($view->result)==0){
+			if($cron!=""){
+				$email = EMAIL_NOTIFY;
+				$module = 'mms_generator';
+				$key = 'key';
+				$language = language_default();
+				$params = array('file'=>$filepath.$excelfilename);
+				$from = null;
+				$send = FALSE;
+				$message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+				$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+				$message['subject'] = "[CSA Outbound File] No Transaction file as of ".date("F d, Y",strtotime($dateformat));
+				$message['body'] = array();
+				$message['body'][] = 'No Transaction file available as of '.date("m/d/Y",strtotime($dateformat)).".";
+				$message['body'][] = '--SM Appliance Team';
+				
+				// Retrieve the responsible implementation for this message.
+				$system = drupal_mail_system($module, $key);
+
+				// Format the message body.
+				$message = $system->format($message);
+
+				// Send e-mail.
+				if($system->mail($message)){
+					$statusreturn['status'] = "No transaction on csa outbound file for ".date("F d, Y",strtotime($dateformat));
+					$result = db_query('SELECT transaction_batch_id FROM z_report_logs WHERE filename = :filename', array(':filename' =>  $filenamecheck.".zip"));
+					if($result->rowCount()==0){
+						$nid = db_insert('z_report_logs')->fields(array(
+							'filename' => $filenamecheck.".zip",
+							'start_datetime' => strtotime("now"),
+							'end_datetime' => strtotime("now"),
+							'totalcount'=>0,
+							'totalamount'=>0,
+							'batchamount'=>0,
+							'nooftrx'=>0,
+							'totaltrxammount'=>0,
+							'notrxlines'=>0,
+							'status_logs'=>0
+						))->execute();
+					}
+				}
+			}else{
+				$statusreturn['status'] =  "No Transaction on CSA outbound file for ".date("F d, Y",strtotime($dateformat)).".";
+			}
+			$completegeneratereport = true;
+		}else{
+			$completegeneratereport = false;
+		}
+	}	
+	return $statusreturn ;
+}
+
+function mms_compress_file_check($dateformat,$urlparameter="",$statusmci=""){
+	if($urlparameter!=""){
+		$parameteraddcron = "&typecron_check=1";
+	}else{
+		$parameteraddcron = "";
+	}
+	global $base_root;
+	require_once("object/classoutput.php");
+	$object = new MMS_CLASS;
+	$filepath = MMS_FILE_PATH_ROOT."outbound/zip_file/";
+	$tempdosfilepath = MMS_FILE_PATH_ROOT."outbound/sales_file/dos/";
+	$downloadtofiles = array("P50370423.DOS"=>"poll5-file-text","P40370423.DOS"=>"poll4-file-text");
+	$view = views_get_view('order_productlist'); 
+	$view->set_display('page_validation_result'); 
+	$view->exposed_input['created']['value']['date'] = $dateformat;
+	$view->pre_execute();
+	$view->render();
+	$completegeneratereport = false;
+	while($completegeneratereport == false){
+		if(count($view->result)>0){
+			foreach ($downloadtofiles as $key => $value){
+				$content = file_get_contents($base_root."/".$value."?created%5Bvalue%5D%5Bdate%5D=".$dateformat.$parameteraddcron);
+				$fp = fopen($tempdosfilepath.$key, 'w');
+				fwrite($fp, '');
+				fwrite($fp, $content);
+				fclose($fp);
+			}
+			$filesystemcheck = array($tempdosfilepath."FIN.DSS",$tempdosfilepath."P50370423.DOS",$tempdosfilepath."P40370423.DOS");
+			$zipmainpath = "S10370423.".date("mdy",strtotime($dateformat)).".zip";
+			
+			$zipfile = $filepath.$zipmainpath;
+			if(file_exists($zipfile)){
+				unlink($zipfile);
+			}
+			$object->zip_file_compressor($filesystemcheck,$zipfile,true,$tempdosfilepath);
+			if(file_exists($zipfile)){
+				if($urlparameter!=""){
+						if($statusmci!=""){
+							$ftp_server = "10.101.1.31"; 
+							$ftp_user_name = "MMSFiles";
+							$ftp_user_pass = "mmsftppw";
+							$file = $zipfile;
+							$fp = fopen($file, 'r+');
+							$conn_id = ftp_connect($ftp_server);
+							$login_result = ftp_login($conn_id, $ftp_user_name, $ftp_user_pass);
+							if(ftp_fput($conn_id, "SACI-TEST/".$zipmainpath, $fp, FTP_BINARY)){
+								ftp_close($conn_id);
+								fclose($fp);
+								watchdog( 'cron', 'Cron file transfer in !cronftp Success.', array('!cronftp' => l('Outbound MMS')), WATCHDOG_NOTICE);
+								unlink($tempdosfilepath."P50370423.DOS");
+								unlink($tempdosfilepath."P40370423.DOS");
+								$statusreturn['status'] = "Complete";
+							}else{
+								ftp_close($conn_id);
+								fclose($fp);
+								$nid = db_insert('z_report_logs')->fields(array(
+								'filename' => $zipfile,
+								'start_datetime' => 0,
+								'end_datetime' => 0,
+								'totalcount'=>0,
+								'totalamount'=>0,
+								'batchamount'=>0,
+								'nooftrx'=>0,
+								'totaltrxammount'=>0,
+								'notrxlines'=>0,
+								'status_logs'=>0))->execute();
+								watchdog( 'cron', 'Cron file transfer in !cronftp Failed.', array('!cronftp' => l('Outbound MMS')), WATCHDOG_WARNING);
+								if($nid)
+									$statusreturn['status'] = "Failed Transfer";
+							}
+						}else{
+							$statusreturn['status'] = "Complete";	
+							$statusreturn['path']  = $base_root."/outbound/zip_file/".$zipmainpath;
+						}
+					
+				}else {
+					unlink($tempdosfilepath."P50370423.DOS");
+					unlink($tempdosfilepath."P40370423.DOS");
+					$statusreturn['status'] = "Complete";
+					$statusreturn['path']  = $base_root."/outbound/zip_file/".$zipmainpath;
+				}
+			}else{
+				$statusreturn['status'] = "NO file Exist";
+			}
+			$completegeneratereport = true;
+		}else if(count($view->result)==0){
+			if($urlparameter!=""){
+				$email = EMAIL_NOTIFY;
+				$module = 'mms_generator';
+				$key = 'key';
+				$language = language_default();
+				$params = array('file'=>$filepath.$excelfilename);
+				$from = null;
+				$send = FALSE;
+				$message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+				$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+				$message['subject'] = "[MMS Outbound File] No Transaction file as of ".date("F d, Y",strtotime($dateformat));
+				$message['body'] = array();
+				$message['body'][] = 'No Transaction file available as of '.date("m/d/Y",strtotime($dateformat)).".";
+				$message['body'][] = '--SM Appliance Team';
+				// Retrieve the responsible implementation for this message.
+				$system = drupal_mail_system($module, $key);
+				// Format the message body.
+				$message = $system->format($message);
+
+				// Send e-mail.
+				if($system->mail($message)){
+					$result = db_query('SELECT transaction_batch_id FROM z_report_logs WHERE filename = :filename', array(':filename' => "S10370423.".date("mdy",strtotime($dateformat)).".zip"));
+					if($result->rowCount()==0){
+						$nid = db_insert('z_report_logs')->fields(array(
+							'filename' => "S10370423.".date("mdy",strtotime($dateformat)).".zip",
+							'start_datetime' => strtotime("now"),
+							'end_datetime' => strtotime("now"),
+							'totalcount'=>0,
+							'totalamount'=>0,
+							'batchamount'=>0,
+							'nooftrx'=>0,
+							'totaltrxammount'=>0,
+							'notrxlines'=>0,
+							'status_logs'=>0
+						))->execute();
+					}
+				}
+			}
+			$statusreturn['status'] = "No transaction on MMS outbound file for ".date("F d, Y",strtotime($dateformat)).".";
+			$completegeneratereport = true;
+		}else{
+			$completegeneratereport = false;
+		}
+	}
+	
+	return $statusreturn;
+	
+}
+
+function file_attachment_path($orderid){
+	if(file_exists(MMS_FILE_PATH_ROOT."invoice/Sales Invoice_".$orderid.".pdf")){
+		unlink(MMS_FILE_PATH_ROOT."invoice/Sales Invoice_".$orderid.".pdf");
+	}
+	global $user;
+	$order = uc_order_load($orderid);
+	$account = user_load($user->uid);
+	$query = db_query('SELECT id,payment_method,tin,smac_no FROM {checkout_vat_inc} WHERE order_id = :oid', array(':oid' => $orderid));
+	$recordinvoice = $query->fetchAssoc();
+	$paymentmethod = $recordinvoice['payment_method'];	
+	$tin = $recordinvoice['tin'];
+	$smacnumber = (!empty($recordinvoice['smac_no']))?substr($recordinvoice['smac_no'],0,4)."-".substr($recordinvoice['smac_no'],4,4)."-".substr($recordinvoice['smac_no'],8,4)."-".substr($recordinvoice['smac_no'],12,4):'N/A';
+	$object = db_query("SELECT tracking_number FROM uc_shipments WHERE order_id = :oid",array(':oid' => $orderid));
+	$awb = $object->fetchAssoc();
+	
+	require_once("dompdf/dompdf_config.inc.php");
+	$filepath = MMS_FILE_PATH_ROOT."invoice/";
+	$mainfile = "sample_".$orderid.".pdf";
+	$html ='<html><body>';
+	$html .='<table width="100%">
+				<tr>
+					<td><img src="'.MMS_FILE_PATH_ROOT.'sites/all/themes/fusion/sm_appliance/images/smappliancewhite.png" /></td>
+					<td nowrap="nowrap" align="right">
+						<strong>STAR APPLIANCE CENTER, INC.</strong> <br  />
+						e-Store <br  />
+						SM Megamall Building corner EDSA <br  />
+						Brgy. Wack-Wack, Mandaluyong City <br  />
+						Tel. No.: (+63) 2 831-8000 loc. 3502 <br  />
+						VAT Reg.: TIN 000-086-204-000<br  />
+					</td>
+				<tr>
+			</table>
+			<br />
+			<br />
+			<table>
+				<tr>
+					<td align="right"><strong>SALES INVOICE No. 423-'.str_pad($recordinvoice['id'],10, "0", STR_PAD_LEFT).'</strong></td>
+				</tr>
+			</table>
+			<table>
+				<tr>
+					<td align="right">
+						<strong><span style="float:left;">DATE:</span> <span style="float:right">'.date("m/d/y",$order->created).'</span></strong>
+					</td>
+				</tr>
+			</table>
+			<table style="width:100%;">
+				<tr>
+					<td style="border-top: 1px solid #ccc; border-right: 1px solid #ccc; border-left: 1px solid #ccc; border-bottom: 1px solid #ccc; padding-left: 10px;">Received from:<br />'.$order->billing_first_name . ' ' . $order->billing_last_name.' </td>
+					<td style="padding-left: 10px; border-top: 1px solid #ccc; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">Business Style:<br />---</td>
+					<td style="padding-left: 10px; border-top: 1px solid #ccc; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">AWB
+					Number:<br />'.str_pad($awb['tracking_number'],9, "0", STR_PAD_LEFT).'</td>    
+				</tr>
+				 <tr>
+					<td style="padding-left: 10px; border-left: 1px solid #ccc; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">TIN:<br /> '.$tin.'</td>
+					<td style="padding-left: 10px; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;">Reg. Number:<br />801</td>
+					<td style="padding-left: 10px; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">Tender Type:<br />'.$paymentmethod.'</td>    
+				</tr> 
+				  <tr>
+					<td colspan="2" style="padding-left: 10px; border-bottom: 1px solid #ccc; border-left: 1px solid #ccc; border-right: 1px solid #ccc;">Address: '.$order->billing_street1.', '.$order->billing_city.', '._x_get_prov($order->billing_zone).', Philippines </td>     
+					<td style="padding-left: 10px; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">Loyalty Card No.: '.$smacnumber.'</td> 
+				</tr> 
+				<tr>
+					<td colspan="2" style="padding-left: 10px; border-left: 1px solid #ccc; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;">The sum of pesos: <br  />'.number_to_words_two($order->order_total).'</td>
+					<td style="padding-left: 10px; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;">Value:<br /> PHP '.number_format($order->order_total, 2, '.', ',').'</td>    
+				</tr>
+			</table>
+		<table id="invoice-item" style="width: 100%;">
+        <tr>
+        	<td style="border-left: 1px solid #ccc; border-right: 1px solid #ccc; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: 10px 0; ">Qty</td>
+            <td style="border-right: 1px solid #ccc; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;">Unit</td> 
+            <td style="border-right: 1px solid #ccc; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;">UPC Barcode</td>
+            <td style="border-right: 1px solid #ccc; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;">Description</td>
+            <td style="border-right: 1px solid #ccc; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;">Unit Price</td> 
+            <td style="border-right: 1px solid #ccc; border-top: 1px solid #ccc; border-bottom: 1px solid #ccc;">Amount</td> 
+        </tr>';	
+	$total_sale = 0;
+	$products = $order->products;
+	foreach ($products as $product):	
+		$total_sale += ($product->price * $product->qty);
+		$upc_barcode  = '';
+		$node = node_load($product->nid); 
+		$upc_barcode = (!empty($node->field_barcode['und'][0]['value']))?$node->field_barcode['und'][0]['value']:' ';
+		
+     $html .='<tr>
+				<td align="center" style="border-left: 1px solid #ccc; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">'.$product->qty.'</td>
+				<td align="center" style="border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">pc</td>
+				<td align="center" width="150" style="border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">'.$upc_barcode.'</td>
+				<td style="border-right: 1px solid #ccc; padding-left: 10px; border-bottom: 1px solid #ccc;">'.$product->title.'</td>
+				<td style="border-right: 1px solid #ccc; padding-left: 10px; border-bottom: 1px solid #ccc;">PHP  <span style="float:right;">'.number_format($product->price, 2, '.', ',').'</span></td>
+				<td style="border-right: 1px solid #ccc; padding-left: 10px; border-bottom: 1px solid #ccc;">PHP <span style="float:right;">'.number_format(($product->price * $product->qty), 2, '.', ',').'</span></td>
+			</tr>';
+	endforeach;
+    $html .= '<tr>
+        	<td  align="center" style="border-left: 1px solid #ccc; border-right: 1px solid #ccc;">...</td>
+            <td align="center" style="border-right: 1px solid #ccc;">...</td>
+            <td align="center" width="150" style="border-right: 1px solid #ccc;">9019</td>
+            <td style="border-right: 1px solid #ccc; padding-left: 10px;">Delivery Charge</td>
+            <td style="border-right: 1px solid #ccc; padding-left: 10px;">PHP  <span style="float:right;">'. number_format(($order->order_total - $total_sale), 2, '.', ',').'</span></td>
+            <td style="border-right: 1px solid #ccc; padding-left: 10px;">PHP <span style="float:right;">'. number_format(($order->order_total - $total_sale), 2, '.', ',').'</span></td>
+        </tr>
+    <tr>
+        <td style="border-bottom: 1px solid #ccc; border-left: 1px solid #ccc; border-right: 1px solid #ccc;"></td>
+        <td style="border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;"></td>
+        <td width="100" style="border-bottom: 1px solid #ccc; border-right: 1px solid #ccc; color: transparent; height: 200px;"></td>
+        <td style="border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;"></td>
+        <td style="border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;"></td>
+        <td style="border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;"></td>
+    </tr>
+    <tr>
+    	<td colspan="4" style="border-left: 1px solid #ccc; border-right: 1px solid #ccc;" align="center">Received the above merchandise in good order and condition</td>
+        <td style="border-right: 1px solid #ccc; padding-left: 10px;">TOTAL SALES:</td>
+        <td style="border-right: 1px solid #ccc; padding-left: 10px;">PHP '.number_format($order->order_total, 2, '.', ',').'</span></td> 
+    </tr>
+    
+
+    <tr>
+    	<td colspan="4" style="border-left: 1px solid #ccc; border-bottom: 1px solid #ccc; border-right: 1px solid #ccc;"></td>
+        <td style="border-right: 1px solid #ccc; padding-left: 10px;">VATABLE SALES:</td>
+        <td  style="border-right: 1px solid #ccc; padding-left: 10px;">PHP '.number_format(($order->order_total / 1.12), 2, '.', ',').'</span></td> 
+    </tr>
+    
+    <tr>
+    	<td colspan="3" align="center" style="border-left: 1px solid #ccc; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">SIGNATURE OVER PRINTED NAME</td>
+        <td align="center" style="border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;">DATE</td>
+        <td style="border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; padding-left: 10px;">VAT AMOUNT:</td>
+        <td style="border-right: 1px solid #ccc; border-bottom: 1px solid #ccc; padding-left: 10px;">PHP '.number_format(($order->order_total - ($order->order_total / 1.12)), 2, '.', ',').'</span></td> 
+    </tr>
+	</table>';
+	$html .='</body></html>';
+	$dompdf = new DOMPDF(); 
+	$dompdf->load_html($html);
+	$dompdf->set_paper("A3","landscape");
+	$dompdf->render();
+	$pdf = $dompdf->output();
+	
+	$objectfile = file_put_contents(MMS_FILE_PATH_ROOT."invoice/Sales Invoice_".$orderid.".pdf", $pdf);
+	if($objectfile)
+		return "invoice/Sales Invoice_".$orderid.".pdf";
+	else
+		return "FAILED";
+}
+
+function number_to_words_two($number)
+{
+    if ($number > 999999999)
+    {
+       throw new Exception("Number is out of range");
+    }
+
+    $Gn = floor($number / 1000000);  /* Millions (giga) */
+    $number -= $Gn * 1000000;
+    $kn = floor($number / 1000);     /* Thousands (kilo) */
+    $number -= $kn * 1000;
+    $Hn = floor($number / 100);      /* Hundreds (hecto) */
+    $number -= $Hn * 100;
+    $Dn = floor($number / 10);       /* Tens (deca) */
+    $n = $number % 10;               /* Ones */
+    $cn = round(($number-floor($number))*100); /* Cents */
+    $result = "";
+
+    if ($Gn)
+    {  $result .= number_to_words_two($Gn) . " Million, ";  }
+
+    if ($kn)
+    {  $result .= (empty($result) ? "" : " ") . number_to_words_two($kn) . " Thousand"; }
+
+    if ($Hn)
+    {  $result .= (empty($result) ? "" : " ") . number_to_words_two($Hn) . " Hundred";  }
+
+    $ones = array("", "One", "Two", "Three", "Four", "Five", "Six",
+        "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen",
+        "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eightteen",
+        "Nineteen");
+    $tens = array("", "", "Twenty", "Thirty", "Fourty", "Fifty", "Sixty",
+        "Seventy", "Eigthy", "Ninety");
+
+    if ($Dn || $n)
+    {
+       if (!empty($result))
+       {  $result .= " and ";
+       }
+
+       if ($Dn < 2)
+       {  $result .= $ones[$Dn * 10 + $n];
+       }
+       else
+       {  $result .= $tens[$Dn];
+          if ($n)
+          {  $result .= "-" . $ones[$n];
+          }
+       }
+    }
+
+    if ($cn)
+    {
+       if (!empty($result))
+       {  $result .= ' Pesos and ';
+       }
+       $title = $cn==1 ? 'cent ': 'cents';
+       $result .= strtolower(number_to_words_two($cn)).' '.$title;
+    }
+
+    if (empty($result))
+    {  $result = "zero"; }
+
+    return $result;
+}
+
+function hashtotal($dategenerate){
+	global $base_root;
+	require_once("dompdf/dompdf_config.inc.php");
+	$filepath = MMS_FILE_PATH_ROOT."outbound/bir/";
+	$filename = "000086204S".date('mY',strtotime($dategenerate))."H.pdf";
+	$arrayamount = array('vatable_sales'=>0.00,'vat_amt'=>0.00);
+	$view = views_get_view('order_productlist');  
+	$view->set_display('page_2');
+	$view->exposed_input['created']['value']['date'] = $dategenerate;
+	$view->render();
+	$array = $view->result;
+	$countrow = 0;
+	foreach ($array as $value):
+		$object = db_query("SELECT vat_amt,vatable_sale FROM checkout_vat_inc WHERE order_id = :oid",array(':oid' => $value->order_id));
+                $record = $object->fetchAssoc(); 
+		if($object->rowCount()>0)
+		      $countrow++;	
+		$arrayamount['vatable_sales'] += $record['vatable_sale']; 
+        $arrayamount['vat_amt'] += $record['vat_amt'];         
+	endforeach;	
+	$html ='<html><body>';
+	$html .='<table width="100%">';
+	$html .='<thead><tr><th style="text-align:right;" colspan="2"><p style="margin:0px;">Extraction Date: '.date("m/d/Y").'</p><p style="margin:0px;">Extraction Time: '.date("H:i:s").'</p></th></tr><tr><th style="text-align:center;" colspan="2"><h4 style="margin:0px;">Sales List Summary (SLS) Hash Total Report</h4><p style="margin:0px;">For the Month of '.date('F Y',strtotime($dategenerate)).'</p></th></tr>
+    </thead><tbody><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>Total Vatable Sales</td><td>'.number_format($arrayamount['vatable_sales'],2,".",",").'</td></tr><tr><td>Total Vat Exempt Sales</td><td>0.00</td></tr><tr><td>Total Zero Rated Sales</td><td>0.00</td></tr><tr><td>Total Vat Amount</td><td>'.number_format($arrayamount['vat_amt'],2,".",",").'</td></tr><tr><td>Total Line Record</td><td>'.$countrow.'</td></tr><tr><td>File Name</td><td>000086204S'.date('mY',strtotime($dategenerate)).'.dat</td></tr></tbody>';
+	$html .='</table>';
+	$html .='</body></html>';
+	
+	$dompdf = new DOMPDF(); 
+	$dompdf->load_html($html);
+	$dompdf->set_paper("A3","landscape");
+	$dompdf->render();
+	//$dompdf->stream($filename);
+	
+	$pdf = $dompdf->output();
+	if(file_exists("outbound/bir/".$filename))
+		unlink("outbound/bir/".$filename);
+	$objectfile = file_put_contents($filepath.$filename, $pdf);
+	if($objectfile)
+		return array('status'=>"Complete",
+					'path'=>"bir/".$filename,
+					'filepath'=>$filename);
+	else
+		return array('status'=>"Failed");
+	
+}
+
+function outbound_interface_file($vardateto,$vardatefrom){
+	$dateto = strtotime($vardateto." 23:59:59");
+	$datefrom = strtotime($vardatefrom." 00:00:00");	
+	$sql = "SELECT * FROM z_report_logs WHERE (start_datetime BETWEEN :from AND :to) AND (status_logs = 1)";
+    $array = array(":from"=>$datefrom,":to"=>$dateto);
+	$result = db_query($sql,$array);
+	foreach ($result as $key => $record):
+		if($key == 0)
+			$startdate = $record->start_datetime;
+		else if(($result->rowCount()-1) == $key)
+			$endofdate = $record->end_datetime;
+	endforeach;
+	$html ='<html><body>';
+	$html = '<h2 class="printtitle" style="font-size: 14px;text-align:center;">STAR APPLIANCE CENTER, INC.</h2>
+			<h2 class="printtitle" style="font-size: 16px;text-align:center;">OUTBOUND INTERFACE SUMMARY REPORT</h2>
+			<h2 class="printtitle" style="font-size: 14px;text-align:center;">For the Period '.date("F d, Y",$datefrom).' to '.date("F d, Y",$dateto).'</h2><br />
+			<h3>Process Date: '.date("d-M-Y",$startdate).' to '.date("d-M-Y",$endofdate).'</h3>
+			<h3>Process Time: '.date("h:i:s",$startdate).' to '.date("h:i:s",$endofdate).'</h3>
+			<h3>Extraction & Sending Status: Successful</h3>';
+	$html .='<table width="100%" border="1">';
+	$html .='<thead>
+				<tr>
+					<th rowspan="2" style="text-align:center;">File Name</th>
+					<th colspan="2" style="text-align:center;">Process Dates</th>
+					<th colspan="2" style="text-align:center;">Hash Totals</th>
+					<th colspan="5" style="text-align:center;">Transaction Details</th>
+				</tr>
+				<tr>
+					<th>Start</th>
+					<th>End</th>
+					<th>Total Count</th>
+					<th>Total Amount</th>
+					<th>Transaction Batch Name</th>
+					<th>Batch Amount</th>
+					<th>No. of Trxs</th>
+					<th>Total Trx Amount</th>
+					<th>Trx Lines</th>
+				</tr>
+			</thead>';
+	$html .= '<tbody>';
+	$queryresult = db_query($sql,$array);
+	foreach ($queryresult  as $key => $record):
+		$html .= '<tr>';
+		$html .= '<td style="text-align:center;">'.$record->filename.'</td>
+		<td style="text-align:center;">'.date("m/d/Y h:i:s",$record->start_datetime).'</td>
+		<td style="text-align:center;">'.date("m/d/Y h:i:s",$record->end_datetime).'</td>
+		<td style="text-align:center;">'.$record->totalcount.'</td>
+		<td style="text-align:center;">'.number_format($record->totalamount,2,".",",").'</td>
+		<td style="text-align:center;"> estore#'.$record->transaction_batch_id.'</td>
+		<td style="text-align:center;">'.number_format($record->batchamount,2,".",",").'</td>
+		<td style="text-align:center;">'.$record->nooftrx.'</td>
+		<td style="text-align:center;">'.number_format($record->totaltrxammount,2,".",",").'</td>
+		<td style="text-align:center;">'.$record->notrxlines.'</td>';
+		$html .= '</tr>';
+	endforeach;
+	$html .= '</tbody></table></body></html>';
+	$filepath = MMS_FILE_PATH_ROOT."outbound/interface/";
+	$filename = "OUTBOUND INTERFACE SUMMARY REPORT.pdf";
+	require_once("dompdf/dompdf_config.inc.php");
+	$dompdf = new DOMPDF(); 
+	$dompdf->load_html($html);
+	$dompdf->set_paper("A3","landscape");
+	$dompdf->render();
+	$pdf = $dompdf->output();
+	$objectfile = file_put_contents($filepath.$filename, $pdf);
+	if($objectfile)
+		return array('status'=>"Complete",'path'=>"interface/".$filename,'filepath'=>$filename);
+	else
+		return array('status'=>"Failed");
+}
+
+function sls_to_dat($datenow){
+	global $base_root;
+	$filepath = MMS_FILE_PATH_ROOT."outbound/bir_report/";
+	$filename = "000086204S".date("mY",strtotime($datenow));
+	$content = file_get_contents($base_root."/sls_report_page_txt?created%5Bvalue%5D%5Bdate%5D=".$datenow);
+	$fp = fopen($filepath."dat/".$filename.".dat", 'w');
+	fwrite($fp, '');
+	fwrite($fp, $content);
+	fclose($fp);
+	$zipfile = $filepath."zip/".$filename.".zip";
+	require_once("object/classoutput.php");
+	$object = new MMS_CLASS;
+	$object->zip_file_compressor(array($filepath."dat/".$filename.".dat"),$zipfile,true,$filepath."dat/");
+	
+	if(file_exists($zipfile)){
+		unlink($filepath."dat/".$filename.".dat");
+		$return['status'] = "Complete";
+		$return['path'] = $base_root."/outbound/bir_report/zip/".$filename.".zip";
+	}
+	else{
+		$return['status'] = "Failed";
+	}
+	return $return;
+}
+
+function xend_to_excel($datenow,$cronchecker=""){
+	global $base_root;
+    $view = views_get_view('daily_xend_item_transaction');  
+	$view->exposed_input['created']['value']['date'] = $datenow;
+	$view->render();
+	$array = $view->result;
+	
+	if(count($view->result)>0){
+	foreach($view->result as $value){
+		if(isset($inventory[$value->node_nid]))
+			$inventory[$value->node_nid]['qty'] += $value->uc_order_products_qty;
+		else{
+			$fetchinfo = node_load($value->node_nid);
+			$inventory[$value->node_nid]['barcode'] = (isset($fetchinfo->field_barcode['und'][0]['value']))?$fetchinfo->field_barcode['und'][0]['value']:0;
+			$inventory[$value->node_nid]['title'] = $value->node_title;
+			$inventory[$value->node_nid]['qty'] = $value->uc_order_products_qty;
+			$inventory[$value->node_nid]['sku'] = $value->uc_order_products_model;
+		}
+	}
+	}else{
+		$inventory = array();
+	}
+	if(count($view->result)>0){
+	foreach($view->result as $value){
+		if(isset($ordermethod[$value->uc_orders_order_id][$value->node_nid]))
+			$ordermethod[$value->node_nid]['qty'] += $value->uc_order_products_qty;
+		else{
+			$fetchinfo = node_load($value->node_nid);
+			$object = db_query("SELECT id FROM checkout_vat_inc WHERE order_id = :oid",array(':oid' => $value->uc_orders_order_id));
+			if($object->rowCount()>0){
+				$record = $object->fetchAssoc();
+				$ordermethod[$value->uc_orders_order_id][$value->node_nid]['transaction_number'] = "423-".str_pad($record['id'], 10, '0', STR_PAD_LEFT);
+			}else{
+				$ordermethod[$value->uc_orders_order_id][$value->node_nid]['transaction_number'] = 0;
+			}
+			$object = db_query("SELECT tracking_number FROM uc_shipments WHERE order_id = :oid",array(':oid' => $value->uc_orders_order_id));
+			$record = $object->fetchObject();
+			$ordermethod[$value->uc_orders_order_id][$value->node_nid]['awb_number'] =  (isset($record->tracking_number))?$record->tracking_number:0;
+			$ordermethod[$value->uc_orders_order_id][$value->node_nid]['barcode'] = (isset($fetchinfo->field_barcode['und'][0]['value']))?$fetchinfo->field_barcode['und'][0]['value']:0;
+			$ordermethod[$value->uc_orders_order_id][$value->node_nid]['title'] = $value->node_title;
+			$ordermethod[$value->uc_orders_order_id][$value->node_nid]['qty'] = $value->uc_order_products_qty;
+			$ordermethod[$value->uc_orders_order_id][$value->node_nid]['sku'] = $value->uc_order_products_model;
+		}
+	}
+	}else{
+		$ordermethod = array();
+	}
+	$filepath = MMS_FILE_PATH_ROOT."outbound/xend/";
+	
+	require_once 'excel/PHPExcel.php';
+	require_once 'excel/PHPExcel/IOFactory.php';
+	$objPHPExcel = new PHPExcel();
+	$sharedStyle1 = new PHPExcel_Style();
+	$activesheet = $objPHPExcel->getActiveSheet();
+	$objPHPExcel->setActiveSheetIndex(0);
+	$activesheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+	/*$activesheet->getStyle('A11')->getFont()->setBold(true)->setSize(14);$activesheet->getStyle('A11')->getAlignment()->setHorizontal(PHPExcel_Style_Alignment::HORIZONTAL_CENTER);
+	*/
+	$activesheet->getStyle('A5')->getFont()->setBold(true)->setSize(14);
+	$activesheet->getStyle('A5')->getAlignment()->setHorizontal(PHPExcel_Style_Alignment::HORIZONTAL_CENTER);
+	$activesheet->mergeCells('A3:C3');
+	//$activesheet->mergeCells('A11:C11');
+	$activesheet->mergeCells('A5:C5');
+	$activesheet->getStyle('A3')->getAlignment()->setWrapText(true);
+	$activesheet->getColumnDimension('A')->setWidth(20);
+	$activesheet->getColumnDimension('B')->setWidth(60);
+	$activesheet->getColumnDimension('C')->setWidth(20);
+	$activesheet->getRowDimension('3')->setRowHeight(40);
+	$totalcell = 6+count($inventory);
+	$sharedStyle1->applyFromArray(array('borders' => array('top'=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'bottom'=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'left'	=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'right'	=> array('style' => PHPExcel_Style_Border::BORDER_THIN))));
+	$activesheet->setSharedStyle($sharedStyle1, "A6:C".($totalcell));
+	$arraytablesetvalue = array(
+		"A1"=>"STAR APPLIANCE CENTER INC.",
+		"A2"=>"e-Store Warehouse",
+		"A3"=>"SM Megamall Building corner EDSA \n Brgy. Wack-Wack, Mandaluyong City",
+			"A".(2+$totalcell)=>"Prepared by:",
+			"C".(2+$totalcell)=>"Received by:",
+			"A".(3+$totalcell)=>"_____________",
+			"C".(3+$totalcell)=>"_____________",
+			"A".(4+$totalcell)=>"Name:",
+			"C".(4+$totalcell)=>"Name:",
+			"A".(5+$totalcell)=>"Date:",
+			"C".(5+$totalcell)=>"Date:",
+			"A".(6+$totalcell)=>"Time:",
+			"C".(6+$totalcell)=>"Time:",
+		
+		'A5'=>"TRANSMITTAL SLIP",
+		'A6'=>"ITEMCODE",
+		'B6'=>"DESCRIPTION",
+		'C6'=>"QUANTITY"
+		);
+		/*
+			
+			"A5"=>"Prepared by:",
+			"C5"=>"Received by:",
+			"A6"=>"_____________",
+			"C6"=>"_____________",
+			"A7"=>"Name:",
+			"C7"=>"Name:",
+			"A8"=>"Date:",
+			"C8"=>"Date:",
+			"A9"=>"Time:",
+			"C9"=>"Time:",
+		*/
+	foreach ($arraytablesetvalue as $key=>$value)
+		$activesheet->setCellValue($key,$value);
+	$intcount = 7;	
+	if(count($inventory)>0){
+		foreach ($inventory as $key=>$value){
+			$activesheet->setCellValue("A".$intcount,"'".$value['barcode']);
+			$activesheet->setCellValue("B".$intcount,"SKU - ".$value['sku'] ." | ".$value['title']);
+			$activesheet->setCellValue("C".$intcount,$value['qty']);
+			$intcount++;
+		}
+	}
+		
+	$activesheet->setTitle('Sheet 1');
+	
+	$countactivesheet = 1;
+	$namesheet = 2;
+	if(count($ordermethod)>0){
+		foreach ($ordermethod as $mainkey=>$mainvalue){
+			$columnkey = 2;
+			// Create a new worksheet, after the default sheet
+			$objPHPExcel->createSheet();
+
+			// Add some data to the second sheet, resembling some different data types
+			$objPHPExcel->setActiveSheetIndex($countactivesheet);
+
+			$activesheet = $objPHPExcel->getActiveSheet();
+			
+			$arraycolumnwidthset = array('A'=>30,'B'=>30,'C'=>50,'D'=>30,'E'=>30);
+			foreach ($arraycolumnwidthset as $key=>$value)
+				$activesheet->getColumnDimension($key)->setWidth($value);
+			
+			$activesheet->setSharedStyle($sharedStyle1, "A1:E".(1+count($mainvalue)));
+			$arraytablesetvalue = array("A1"=>"TRACKINGNUMBER","B1"=>"ITEMCODE","C1"=>"DESCRIPTION","D1"=>"QUANTITY","E1"=>"AWB");
+			foreach ($arraytablesetvalue as $key=>$value)
+				$activesheet->setCellValue($key,$value);
+			
+			foreach($mainvalue as $key=>$value){
+				$activesheet->setCellValue("A".$columnkey,$value['transaction_number']);
+				$activesheet->setCellValue("B".$columnkey,"'".$value['barcode']);
+				$activesheet->setCellValue("C".$columnkey,"SKU - ".$value['sku'] ." | ".$value['title']);
+				$activesheet->setCellValue("D".$columnkey,$value['qty']);
+				$activesheet->setCellValue("E".$columnkey,$value["awb_number"]);
+				$columnkey++;
+			}
+			// Rename 2nd sheet
+			$activesheet->setTitle('Sheet '.$namesheet);
+			$countactivesheet++;
+			$namesheet++;
+		}
+	}
+	
+	
+	$excelfilename = "SACIXEND".date("mdY",strtotime($datenow)).".xls";
+	$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel5');
+	$objWriter->save($filepath.$excelfilename);
+	$return['status'] = "Complete";
+	$return['path'] = $base_root."/outbound/xend/".$excelfilename;
+	if($cronchecker!=""){
+		//$to = "e.quilala@spinweb.ph,r.villanueva@spinweb.ph,p.ferrer@spinweb.ph";
+		$email = EMAIL_NOTIFY;
+		$module = 'mms_generator';
+		$key = 'key';
+		$language = language_default();
+		$params = array('file'=>$filepath.$excelfilename);
+		$from = null;
+		$send = FALSE;
+		$message = drupal_mail($module, $key, $email, $language, $params, $from, $send);
+		$attachment = array(
+		'filecontent' => $filepath.$excelfilename,
+		'filename' => $excelfilename,
+		'filemime' => 'application/octet-stream');
+		$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
+		$message['subject'] = "Transmittal Slip & Packing List - ".date("F d, Y",strtotime($datenow));
+		$message['body'] = array();
+		$message['body'][] = 'Automated Transmittal Slip & Packing List as of '.date("F d, Y",strtotime($datenow));
+		$message['body'][] = '';
+		$message['body'][] = 'Thanks,';
+		$message['body'][] = '';
+		$message['body'][] = 'SM Appliance Center';
+		$message['params']['attachments'][] = $attachment;
+		// Retrieve the responsible implementation for this message.
+		$system = drupal_mail_system($module, $key);
+
+		// Format the message body.
+		$message = $system->format($message);
+
+		// Send e-mail.
+		if($system->mail($message))
+			return "Xend Packing list Sent to ".EMAIL_NOTIFY;
+		else	
+			return "Failed";
+		
+	}else{
+		return $return;
+	}
+	
+}
+
+function marketing_dashboard_excel($datefrom,$dateto){
+    if(strtotime($datefrom)>=strtotime($dateto)){
+        $return['status'] = "Failed";
+        $return['path'] = "Failed to Generate Report";
+        return $return;
+    }else {
+        $array  = marketing_dashboard_array($datefrom,$dateto);
+        if(count($array)>31){
+            $return['status'] = "Failed";
+            $return['path'] = "The maximum date range is 31 days";
+            return $return;
+        }
+    }
+    
+    global $base_root;
+    $excelettercheck = array(1=>"B",2=>"C",3=>"D",4=>"E",5=>"F",6=>"G",7=>"H",8=>"I",9=>"J",10=>"K",11=>"L",12=>"M",13=>"N",14=>"O",15=>"P",16=>"Q",17=>"R",18=>"S",19=>"T",20=>"U",21=>"V",22=>"W",23=>"X",24=>"Y",25=>"Z",26=>"AA",27=>"AB",28=>"AC",29=>"AD",30=>"AE",31=>"AF",32=>"AG");
+    
+    /*INCLUDE THE FIX VARIABLE*/
+    require_once 'excel/PHPExcel.php';
+    require_once 'excel/PHPExcel/IOFactory.php';
+    $objPHPExcel = new PHPExcel();
+    $sharedStyle1 = new PHPExcel_Style();
+    $activesheet = $objPHPExcel->getActiveSheet();
+    $objPHPExcel->setActiveSheetIndex(0);
+    /*End INCLUDE THE FIX VARIABLE*/
+    /*SET STYLE AND BORDER */
+    $activesheet->getStyle('A3')->getFont()->setBold(true);
+    $activesheet->getStyle('A4')->getAlignment()->setHorizontal(PHPExcel_Style_Alignment::HORIZONTAL_CENTER);
+    $activesheet->getColumnDimension('A')->setWidth(40);
+    $sharedStyle1->applyFromArray(array('borders' => array('top'=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'bottom'=> array('style' => PHPExcel_Style_Border::BORDER_THIN),'left'    => array('style' => PHPExcel_Style_Border::BORDER_THIN),'right'    => array('style' => PHPExcel_Style_Border::BORDER_THIN))));
+    
+    /*END SET STYLE AND BORDER */
+    /*INSERT ELEMENT*/
+    $activesheet->setSharedStyle($sharedStyle1, "A4:".$excelettercheck[(count($array)+1)]."10");
+    $arraytablesetvalue = array("A1"=>"Marketing Dashboard","A3"=>"Site Statistics","A4"=>"Daily",$excelettercheck[(count($array)+1)]."4"=>"Total","A5"=>"Registrations","A6"=>"Transactions","A7"=>" Successful","A8"=>" Failed","A9"=>"    Abandoned","A10"=>"    Cancelled","A11"=>"    Order Not In Checkout");
+    foreach ($arraytablesetvalue as $key=>$value)
+        $activesheet->setCellValue($key,$value);
+    $countervalue = 1;
+    $arraytotal = array(
+		'counting_reg'=>0,
+		'all'=>0,
+		'in'=>0,
+		'out'=>array(
+			'abandoned'=>0,
+			'canceled'=>0,
+			'in_checkout'=>0
+		)
+	);
+    foreach($array as $date => $parameterarray){
+        $activesheet->getColumnDimension($excelettercheck[$countervalue])->setWidth(15);
+        $activesheet->setCellValue($excelettercheck[$countervalue]."4",$date);
+        $activesheet->setCellValue($excelettercheck[$countervalue]."5",$parameterarray['counting_reg']);
+        $activesheet->setCellValue($excelettercheck[$countervalue]."6",$parameterarray['all']);
+        $activesheet->setCellValue($excelettercheck[$countervalue]."7",$parameterarray['in']);
+		$activesheet->setCellValue($excelettercheck[$countervalue]."9",$parameterarray['out']['abandoned']);
+        $activesheet->setCellValue($excelettercheck[$countervalue]."10",$parameterarray['out']['canceled']);
+		$activesheet->setCellValue($excelettercheck[$countervalue]."11",$parameterarray['out']['in_checkout']);
+		
+		$arraytotal['counting_reg'] += $parameterarray['counting_reg'];
+        $arraytotal['all'] += $parameterarray['all'];
+        $arraytotal['in'] += $parameterarray['in'];
+        $arraytotal['out']['abandoned'] += $parameterarray['out']['abandoned'];
+		$arraytotal['out']['canceled'] += $parameterarray['out']['canceled'];
+		$arraytotal['out']['in_checkout'] += $parameterarray['out']['in_checkout'];
+        $countervalue++;
+    }
+    $activesheet->setCellValue($excelettercheck[count($array)+1]."5",$arraytotal['counting_reg']);
+    $activesheet->setCellValue($excelettercheck[count($array)+1]."6",$arraytotal['all']);
+    $activesheet->setCellValue($excelettercheck[count($array)+1]."7",$arraytotal['in']);
+    $activesheet->setCellValue($excelettercheck[count($array)+1]."9",$arraytotal['out']['abandoned']);
+    $activesheet->setCellValue($excelettercheck[count($array)+1]."10",$arraytotal['out']['canceled']);
+	$activesheet->setCellValue($excelettercheck[count($array)+1]."11",$arraytotal['out']['in_checkout']);
+	
+	 
+    /*END INSERT ELEMENT*/
+    
+    
+    /*CREATING A FILE SYSTEM*/
+    $filepath = MMS_FILE_PATH_ROOT."outbound/marketing/";
+    $excelfilename = "Marketing Dashboard ".date("Y-m-d",strtotime($datefrom))." to ".date("Y-m-d",strtotime($dateto)).".xls";
+    $objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel5');
+    $objWriter->save($filepath.$excelfilename);
+    $return['status'] = "Complete";
+    $return['path'] = $base_root."/outbound/marketing/".$excelfilename;
+    /*END CREATING A FILE SYSTEM*/
+    return $return;
+}
+
+function marketing_dashboard_array($datefrom,$dateto){
+    $totaldays = (strtotime($dateto) - strtotime($datefrom)) / (60 * 60 * 24);
+    $counterdate = 0;
+    $arraycounting = array();
+    while($counterdate<=$totaldays){
+        $dategenerate = date("Y-m-d", strtotime($datefrom)+(86400*$counterdate));
+        $regcount = registration_count($dategenerate);
+        $transcount = transaction_check($dategenerate);
+        $arraycounting[$dategenerate] = array_merge($regcount,$transcount);
+        $counterdate++;
+    }
+    return $arraycounting;
+}
+
+function registration_count($dategenerate){
+    $view = views_get_view('user_fetch_roles');
+    $view->set_display('page_1');
+    $view->exposed_input['created']['min'] = $dategenerate." 00:00:00";
+    $view->exposed_input['created']['max'] = $dategenerate." 23:59:59";
+    $view->render();
+    $array = $view->result;
+    return array('counting_reg'=>count($array));
+}
+
+function transaction_check($dategenerate){
+    $arraynumbercheck = array('all'=>'all','in'=>'in');
+    $arraycheker = array();
+    foreach($arraynumbercheck as $key => $value){
+        $view = views_get_view('transaction_numbers');
+        $view->set_display('page_1');
+        $view->exposed_input['created']['value']['date'] = $dategenerate;
+        if($value!="all"){
+            $view->exposed_input['order_status_op'] = $value;
+            $view->exposed_input['order_status'][] = 'payment_received';
+        }
+        $view->render();
+        $array = $view->result;
+        $arraycheker[$key] = count($array);
+    }
+	
+	$arraynumbercheck = array('abandoned','canceled','in_checkout');
+	foreach($arraynumbercheck as $value){
+        $view = views_get_view('transaction_numbers');
+        $view->set_display('page_1');
+        $view->exposed_input['created']['value']['date'] = $dategenerate;
+        $view->exposed_input['order_status_op'] = 'in';
+        $view->exposed_input['order_status'][] = $value;
+        $view->render();
+        $array = $view->result;
+        $cancelarraycheck['out'][$value] = count($array);
+    }
+	$arraycheker = array_merge($arraycheker,$cancelarraycheck);
+	return $arraycheker;
+}
+
+function sku_update_patch_select($date,$status,$id,$nodeid,$action=""){
+    global $base_root;
+    if($status==1){
+        return "Implemented";
+    }else{
+        if(strtotime("now")>=strtotime($date))
+            return '<a href="'.$base_root.'/sku-scheduler?nodeid='.$nodeid.'&id='.$id.$action.'&action=implement">Need to Implement</a>';
+        else
+            return "Not Yet Implemented ";
+    }
+}
+
+function changeprice_skuproduts($nodeid,$skuupdateid){
+        $querystring = db_query('SELECT price FROM z_price_update WHERE id = :id', array(':id' => $skuupdateid));
+        if($querystring->rowCount()>0){
+            foreach($querystring as $value){
+                $priceget = $value->price/100;
+            }
+            
+            $newNode = node_load($nodeid);
+            $newNode->changed = strtotime("now");
+            $newNode->sell_price = $priceget;
+            $nodesave = node_save($newNode);
+            $num_updated = db_update('z_price_update')
+            ->fields(array('status' => 1))
+            ->condition('id',$skuupdateid)
+            ->execute();
+            if($num_updated)
+                return "true";
+            else
+                return "faled to save on status";        
+        }else {
+            return "false no record found";
+        }
+}
+
+function cron_sku_update_check($datenow){
+    $querystring = db_query('SELECT id,nodeid FROM z_price_update WHERE
+    activedate <= :date AND status = 0 ORDER BY timesavenow ASC', array(':date' => $datenow));
+    if($querystring->rowCount()>0){
+        foreach($querystring as $value){
+            changeprice_skuproduts($value->nodeid,$value->id);
+        }
+        return "Complete";
+    }else{
+        return "No Sku Update Now";
+    }
+    
+}

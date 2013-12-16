@@ -1,0 +1,90 @@
+#quicktabs-tabpage-admin_dashboard-1 .view-id-uc_orders{
+margin:10px 0px;
+}
+
+#quicktabs-tabpage-admin_dashboard-1 #edit-submit-uc-orders {
+padding: 5px 10px;
+font-size: 12px;
+}
+#node-4025{
+display:none;
+}
+#quicktabs-tabpage-admin_dashboard-2   .view-id-sm_dashboard_sales, 
+.page-admin-store-reports-sales-dashboard-sales-report .view-id-sm_dashboard_sales{
+position:relative;
+}
+#quicktabs-tabpage-admin_dashboard-2  #edit-reset{
+padding: 5px 10px;
+font-size: 12px;
+margin-top: 38px;
+}
+#quicktabs-tabpage-admin_dashboard-2 #edit-submit-sm-dashboard-sales,
+.page-admin-store-reports-sales-dashboard-sales-report  #edit-submit-sm-dashboard-sales{
+padding: 5px 10px;
+font-size: 12px;
+margin-top: 38px;
+}
+#quicktabs-tabpage-admin_dashboard-2 #edit-created-min-wrapper, 
+#quicktabs-tabpage-admin_dashboard-2 #edit-created-max-wrapper, 
+.page-admin-store-reports-sales-dashboard-sales-report #edit-created-min-wrapper, 
+.page-admin-store-reports-sales-dashboard-sales-report #edit-created-max-wrapper{
+float:left;
+}
+#quicktabs-tabpage-admin_dashboard-2 #edit-filter-date-wrapper, 
+.page-admin-store-reports-sales-dashboard-sales-report #edit-filter-date-wrapper{
+clear:both;
+}
+#quicktabs-tabpage-admin_dashboard-2 .views-widget-per-page, 
+.page-admin-store-reports-sales-dashboard-sales-report  .views-widget-per-page{
+margin-top:20px;
+}
+#quicktabs-tabpage-admin_dashboard-2 .feed-icon, 
+.page-admin-store-reports-sales-dashboard-sales-report .feed-icon {
+text-align: right;
+position: absolute;
+right: 0;
+top: 98px;
+
+}
+#quicktabs-tabpage-admin_dashboard-2 .feed-icon a, 
+.page-admin-store-reports-sales-dashboard-sales-report .feed-icon a
+{
+background:#ff6600;
+padding:5px 10px;
+color:#fff;
+}
+
+#quicktabs-tabpage-admin_dashboard-1 .views-exposed-widget, 
+#quicktabs-tabpage-admin_dashboard-2 .views-widget-filter-tracking_number, 
+#quicktabs-tabpage-admin_dashboard-2 .feed-icon a img, 
+.page-admin-store-reports-sales-dashboard-sales-report .feed-icon a img
+{
+display:none;
+}
+#quicktabs-tabpage-admin_dashboard-1 .views-widget-filter-billing_first_name, 
+#quicktabs-tabpage-admin_dashboard-1 .views-submit-button{
+display:block;
+}
+#block-quicktabs-admin_dashboard li{
+padding:0px;
+}
+#edit-sales-billing-last-name-wrapper{
+display:none;
+}
+#views-exposed-form-sm-dashboard-sales-page .views-reset-button,
+#edit-sales-report-billing-last-name-wrapper{
+display:none;
+}
+.view-id-uc_orders{
+position:relative;
+}
+.view-id-uc_orders .view-header .external-access{
+    position: absolute;
+    right: 0;
+    top: 64px;
+    background: #AAA;
+    color: #000;
+    padding: 5px 10px;
+    font-weight: bold;
+    text-decoration: underline;
+}

@@ -1,0 +1,44 @@
+#block-block-16 .container-filter .listing-container li {
+float: left;
+list-style: none;
+}
+#block-block-16 .container-filter .listing-container li span{
+float: left;
+width: 160px;
+text-transform: uppercase;
+}
+
+
+#block-block-16 .container-filter .listing-container li input{
+float:left;
+}
+#block-block-12 .gutter.inner{
+position:relative;
+}
+
+#block-block-12 .count-item .no-result.messages, .view-header .no-result.messages{
+position: absolute;
+left: 223px;
+top: 59px;
+width: 654px;
+}
+
+.block-compare-product .content .container-compare {
+margin-left: 19px !important;
+}
+#block-block-16 .content .button-submit, 
+#block-block-20 .content .button-submit{
+
+background: url("/sites/all/themes/fusion/sm_appliance/images/button_bg_white.gif") repeat-x scroll center center white;
+border: 1px solid #C7C7C7;
+color: black !important;
+margin: 15px 0;
+padding: 3px 15px;
+}
+
+
+#main-wrapper{
+margin: 20px 0px 0px;
+}
+#block-block-12{
+}

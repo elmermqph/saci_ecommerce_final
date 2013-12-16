@@ -1,0 +1,81 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the uc_xend module.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function uc_xend_requirements($phase) {
+  $t = get_t();
+
+  // Check that the PHP SOAP extension is loaded
+  $has_soap = extension_loaded('soap');
+
+  $requirements['uc_xend_soap'] = array(
+    'title' => $t('SOAP'),
+    'value' => $has_soap ? $t('Installed') : $t('Not Installed'),
+  );
+
+  if (!$has_soap) {
+    $requirements['uc_xend_soap']['severity'] = REQUIREMENT_ERROR;
+    $requirements['uc_xend_soap']['description'] = $t("The Xend API requires the PHP <a href='!soap_url'>SOAP</a> library.", array('!soap_url' => 'http://www.php.net/soap'));
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implements hook_schema().
+ */
+function uc_xend_schema() {
+  $schema = array();
+
+  $schema['uc_xend_products'] = array(
+    'description' => 'Stores product information for Xend shipping quotes.',
+    'fields' => array(
+      'vid' => array(
+        'description' => 'The {uc_products}.vid.',
+        'type'     => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default'  => 0,
+      ),
+      'nid' => array(
+        'description' => 'The {uc_products}.nid.',
+        'type'     => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default'  => 0,
+      ),
+      'pkg_type' => array(
+        'description' => 'The type of package in which the product will be shipped.',
+        'type'     => 'varchar',
+        'length'   => 16,
+        'not null' => TRUE,
+        'default'  => '',
+      ),
+    ),
+    'primary key' => array('vid'),
+    'foreign keys' => array(
+      'nid' => array('uc_products' => 'nid'),
+      'vid' => array('uc_products' => 'vid'),
+    ),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implements hook_uninstall().
+ *
+ * Removes all tables and variables inserted into the
+ * database by this module.
+ */
+function uc_xend_uninstall() {
+  db_delete('variable')
+    ->condition('name', 'uc_xend_%', 'LIKE')
+    ->execute();
+}

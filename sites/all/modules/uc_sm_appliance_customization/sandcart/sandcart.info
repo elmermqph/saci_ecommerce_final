@@ -1,0 +1,9 @@
+name = Sandcart
+description = This module provide a new shipping method
+version = "7.x-1.0"
+core = 7.x 
+dependencies[] = uc_quote
+
+
+package = Custom Module
+configure = admin/store/settings/quotes/settings/sandcart

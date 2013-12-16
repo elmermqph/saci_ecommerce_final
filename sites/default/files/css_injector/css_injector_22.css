@@ -1,0 +1,9 @@
+.view-id-order_productlist .views-field .amount-format{
+display:none;
+}
+#block-system-main {
+width:960px;
+}
+.view-id-order_productlist td{
+border:1px solid #000;
+}

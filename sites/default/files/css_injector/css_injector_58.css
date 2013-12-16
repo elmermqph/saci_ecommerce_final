@@ -1,0 +1,22 @@
+#printbutton #print-order {
+    background: url("/sites/all/themes/fusion/sm_appliance/images/blue-button.jpg") repeat scroll 0 0 transparent;
+    border: 1px solid #009BFF;
+    border-radius: 5px 5px 5px 5px;
+    color: #FFFFFF;
+    height: 23px;
+    margin-right: 10px;
+    text-transform: uppercase;
+    width: 100px;
+}
+
+
+#printbutton > #home-order {
+    background: url("/sites/all/themes/fusion/sm_appliance/images/blue-button.jpg") repeat scroll 0 0 transparent;
+    border: 1px solid #009BFF;
+    border-radius: 5px 5px 5px 5px;
+    color: #FFFFFF;
+    height: 23px;
+    text-transform: uppercase;
+    width: 100px;
+    margin-bottom: 7px;
+}

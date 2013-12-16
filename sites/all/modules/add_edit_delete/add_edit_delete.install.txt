@@ -1,0 +1,48 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function add_edit_delete_schema() {
+	$schema['test'] = array(
+    'description' => 'Statuses the order during MIGS Payment.',
+    'fields' => array(
+      'hsbc_migs_sid' => array(
+        'description' => 'Primary key: the payment status ID.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'title' => array(
+        'description' => 'The status title.',
+        'type' => 'varchar',
+        'length' => 48,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('hsbc_migs_sid'),
+    'foreign keys' => array(
+		'hsbc_migs_sid' => array(
+			'uc_hsbc_migs' => 'hsbc_migs_sid'
+		),
+    ),
+  );
+  
+  $schema['adduser'] = array(
+  	'description' => 'Bla Bla Bla',
+	'fields' => array(
+		'adduser_id' => array(
+        'description' => 'Primary key',
+        'type' => 'int',
+        'length' => 11,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+	),
+	'primary key' => array('adduser_id'),
+  );
+  
+  return $schema;
+}

@@ -1,0 +1,87 @@
+#cboxLoadedContent h1.title, 
+#cboxLoadedContent #header-group-wrapper, 
+#cboxLoadedContent #postscript-bottom-wrapper, 
+#cboxLoadedContent #footer-wrapper,
+#cboxLoadedContent #admin-menu, 
+#cboxLoadedContent #breadcrumbs, 
+#cboxLoadedContent #content-messages{
+display:none;
+}
+#cboxLoadedContent .grid16-16, #cboxLoadedContent body, #cboxLoadedContent div.full-width{
+width:720px;
+min-width:720px;
+margin:0px;
+
+}
+#cboxLoadedContent #page{
+background:none;
+padding:0px;
+}
+.page-categories-product #colorbox #block-system-main{
+margin-top:0px;
+}
+.view-product-teaser-preview {
+margin-top:10px;
+}
+.view-product-teaser-preview .views-field .field-content .images{
+float: left;
+width: 300px;
+}
+.view-product-teaser-preview .views-field .field-content .container{
+width: 370px;
+float:left;
+ border: 1px solid #CCCCCC;
+    padding: 10px;
+}
+.view-product-teaser-preview .views-field .field-content .container h3{
+height:38px;
+}
+
+.view-product-teaser-preview .views-field .field-content .container .model {
+    float: left;
+    padding-right: 10px;
+margin-bottom: 11px;
+}
+.view-product-teaser-preview .views-field .field-content .container .price{
+	clear:both;
+margin-bottom: 10px;
+}
+.view-product-teaser-preview .views-field .field-content .container .discount-price {
+    font-size: 22px;
+    text-decoration: line-through;
+    float: left;
+    width: 130px;
+}
+
+.view-product-teaser-preview .views-field .field-content .container .discount-price.none, .view-product-teaser-preview .views-field .field-content .container .discount-price.P0 {
+    display:none;
+}
+.view-product-teaser-preview .views-field .field-content .container .sell-price {
+    color: #F45D2E;
+    font-size: 22px;
+}
+
+.view-product-teaser-preview .views-field .field-content .container .body-description p {
+    margin: 0.5em 0;
+height: 112px;
+overflow-y: hidden;
+}
+.view-product-teaser-preview .views-field .field-content .container .node-add-to-cart, 
+.view-product-teaser-preview .views-field .field-content .container .more-info a {
+    background: url("/sites/all/themes/fusion/sm_appliance/images/button_bg_orange.gif") no-repeat scroll 0 0 transparent;
+    border: 1px solid #999999;
+    border-radius: 3px 3px 3px 3px;
+    color: #FFFFFF;
+    font-size: 14px;
+    padding: 3px 20px;
+    text-transform: uppercase;
+   float: left;
+}
+.view-product-teaser-preview .views-field .field-content .container .add-to-cart .form-actions{
+	margin:0px;
+}
+.view-product-teaser-preview .views-field .field-content .container .add-to-cart, .view-product-teaser-preview .views-field .field-content .container .more-info{
+	width: 50%;
+	float: left;
+	margin: 0px;
+}

@@ -1,0 +1,80 @@
+/* sm appliance 18*/
+.moving-image {
+    background-color: #FFFFFF;
+    border: 1px solid #ccc;
+    position: absolute;
+    z-index: 10000;
+    width: 160px;
+	height:160px;
+}
+.moving-image img{
+    width: 160px;
+	height: auto;	
+}
+.zoom {
+	display:inline-block;
+	position:relative;
+}
+.zoomImg{
+ /*   height: 200% !important;
+    width: 200% !important;*/
+}
+
+.zoom img {
+display: block;
+    height: auto;
+    max-width: none;
+    width: 300px;
+}
+.hover-text-container{
+    background-color: #666666;
+    bottom: 6px;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: bold;
+    margin-left: 230px;
+    opacity: 0.6;
+    padding-left: 9px;
+    position: absolute;
+    width: 56px;
+    z-index: 1;
+}
+.zoomIcon{
+    bottom: -4px;
+    height: 30px;
+    margin-left: 275px;
+    padding-top: 3px;
+    position: absolute;
+    width: 30px;
+    z-index: 1;
+}
+.zoomIcon img{
+    height: 20px;
+    width: 20px;
+}
+#main-menu-inner{
+	position: relative;
+}
+.preview-normal-hidden{
+    display: block;
+    position: absolute;
+    z-index: 10000;
+}
+.moving-image #popup-box-container .preview-normal img{
+    width: 160px;
+	height:160px;
+}
+.ie #popup-box-container{
+   top:25% !important;
+}
+
+
+#overlay-container {
+    opacity: 0.7;
+-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=70) !important";
+filter: alpha(opacity = 70);
+	behavior: url("/sites/all/themes/fusion/sm_appliance/css/PIE.htc");
+}
+#breadcrumbs{
+display:none !important;
+}

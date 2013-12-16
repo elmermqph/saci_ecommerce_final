@@ -1,0 +1,272 @@
+<?php
+
+
+/*
+ * Implement hook_permission
+ */
+function uc_input_migs_permission(){
+	return array(
+		'access migs manual input form' => array(
+			'title' => t('Access MIGS Manual Input Form'),
+			'description' => t('Permission to access MIGS Manual Input Form'),
+		),
+		
+	);
+}
+
+/*
+ * Implement hook_menu
+ */
+function uc_input_migs_menu() {
+	$items['migs/input'] = array(
+		'title' => 'MIGS Manual Input Form', 
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_migs_manual_input_form'), 
+		'access callback' => 'user_access',
+		// 'access callback' => TRUE,
+		'access arguments' => array('access migs manual input form'),
+	);
+	$items['migs/update/%/%'] = array(
+		'title' => 'MIGS Manual Update Form', 
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('_migs_manual_update_form'), 
+		'access callback' => 'user_access',
+		// 'access callback' => TRUE,
+		'access arguments' => array('access migs manual input form'),
+	);
+  return $items;
+}
+
+
+
+function _migs_manual_input_form($form, $form_state){
+	$orderid = isset($_GET['oid']) ? $_GET['oid'] : NULL;
+	
+	// dsm(uc_order_load($orderid)); 
+	// $zones = db_query("SELECT order_id {uc_hsbc_migs} WHERE order_id = :oid", array(':oid' => $orderid))->fetchAssoc();
+	
+	if(empty($orderid)){
+		header('Location: /admin/store/orders/view');
+		exit;
+	}else{
+		$form['asterisk'] =array(
+			'#type' => 'item',
+			'#markup' => t('Fields with asterisk (<span style="color: red;">*</span>) are required.'),
+		);
+		$form['order_id'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Order Reference'),
+			'#default_value' => $orderid,
+			'#attributes' => array('readonly' => array('readonly')),
+			'#maxlength' => 11,
+			
+		);
+		$form['authorized_no'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Authorization Code'),
+			'#required' => TRUE,
+			'#maxlength' => 6,
+			'#element_validate' => array('_authorized_no_validate'),
+		);
+		$form['trans_no'] = array(
+			'#type' => 'textfield',
+			'#title' => t('MIGS Transaction Number'),
+			'#required' => TRUE,
+			'#maxlength' => 10,
+			'#element_validate' => array('_trans_no_validate'),
+		);
+		$form['receipt_no'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Merchant Transaction Reference'),
+			'#required' => TRUE,
+			'#maxlength' => 12,
+			'#element_validate' => array('_receipt_no_validate'),
+		);
+		
+		$form['submit'] = array(
+			'#type' => 'submit',
+			'#value' => t('Save'),
+		);
+		return $form;
+	}
+}
+
+function _authorized_no_validate($form, $form_state){
+	if(strlen(trim($form_state['values']['authorized_no'])) < 6){
+		form_set_error('authorized_no', t('Please enter valid Authorization Code'));
+	}
+}
+
+
+function _trans_no_validate($form, $form_state){
+	if(strlen(trim($form_state['values']['trans_no'])) < 10){
+		form_set_error('trans_no', t('Please enter valid MIGS Transaction Number'));
+	}
+}
+
+
+function _receipt_no_validate($form, $form_state){
+	if(strlen(trim($form_state['values']['receipt_no'])) < 12){
+		form_set_error('receipt_no', t('Please enter valid Merchant Transaction Reference'));
+	}
+}
+
+
+function _migs_manual_input_form_submit($form, $form_state){
+	$oid = $form_state['values']['order_id'];
+	$order = uc_order_load($oid);
+	$ct = 0;
+	$ct2 = 0;
+	
+	$hsbc_migs = db_query("SELECT order_id FROM {uc_hsbc_migs} WHERE order_id = :oid",array(':oid'=>$order->order_id));
+	foreach ($hsbc_migs  as $record) {
+		$ct2 = $ct2 + 1;
+	}
+	
+	if($ct2 == 0){
+		// drupal_set_message('wala uc_hsbc_migs');
+		$migs = db_insert('uc_hsbc_migs')
+			->fields(array('hsbc_migs_sid','order_id','trans_no','receipt_no','authorized_no'))
+			->values(array(
+				'hsbc_migs_sid' => 0,
+				'order_id' => $oid,
+				'trans_no' => $form_state['values']['trans_no'],
+				'receipt_no' => $form_state['values']['receipt_no'],
+				'authorized_no' => $form_state['values']['authorized_no'],
+			))
+			->execute();
+			
+		$userfetch = user_load($order->uid);
+		$tin = (isset($userfetch->field_tin['und']['0']['value']))?$userfetch->field_tin['und']['0']['value']:'---';
+		$query = db_query("SELECT id,payment_method FROM checkout_vat_inc WHERE order_id = :oid",array(':oid'=>$order->order_id));
+		$smacnumber = ($_SESSION['test-card'] > 0 ) ? $_SESSION['test-card'] : 0;
+		if($query->rowCount()==0){
+		 $order_checkoutz= db_insert('checkout_vat_inc')
+		  ->fields(array('order_id', 'total_sale', 'vatable_sale', 'vat_amt','smac_no','payment_method','tin'))
+		  ->values(array(
+			'order_id' => $order->order_id,
+			'total_sale' => number_format($order->order_total, 2, '.', ''),
+			'vatable_sale' => number_format(($order->order_total / 1.12), 2, '.', ''),
+			'vat_amt' => number_format(($order->order_total - ($order->order_total / 1.12)), 2, '.', ''),
+			'smac_no' => $smacnumber,
+			'payment_method' => 'Credit Card',
+			'tin'=>$tin
+		  ))
+		  ->execute();
+		}
+	
+	
+		$trackingnumber = db_query("SELECT order_id FROM {uc_packages} WHERE order_id = :oid",array(':oid'=>$order->order_id));
+		foreach ($trackingnumber  as $record) {
+			$ct = $ct + 1;
+		}
+		
+		if($ct == 0){
+			// drupal_set_message('wala uc_packages');
+			uc_xend_generate_waybill($order);
+		}
+	}else{
+		drupal_set_message('Sorry, Your order ID already have a MIGS info',$type = 'error');
+	}
+}
+
+
+
+function _migs_manual_update_form($form, $form_state){
+	$orderid = arg(2);
+	$migsid = 0;
+	
+	if(is_numeric($orderid)){
+		$query = db_select('uc_hsbc_migs', 'u');
+		$query->fields('u',array('order_id','hsbc_migs_id','authorized_no','trans_no','receipt_no'))
+			->condition('order_id', $orderid);
+		$result = $query->execute();
+		
+		while($record = $result->fetchAssoc()) {
+			$migsid = $record['hsbc_migs_id'];
+			// $oid = $record['hsbc_migs_id'];
+			$autorizedno = $record['authorized_no'];
+			$transactionno = $record['trans_no'];
+			$receiptno = $record['receipt_no'];
+		}
+	}
+	
+//	if(empty($orderid)){
+//		header('Location: /admin/store/orders/view');
+//		exit;
+//	}else{
+		$form['hsbc_migs_id'] = array(
+			'#type' => 'hidden', 
+			'#value' => $migsid,
+		);
+		
+		$form['asterisk'] =array(
+			'#type' => 'item',
+			'#markup' => t('Fields with asterisk (<span style="color: red;">*</span>) are required.'),
+		);
+		
+		$form['order_id'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Order Reference'),
+			'#default_value' => $orderid,
+			'#attributes' => array('readonly' => array('readonly')),
+			'#maxlength' => 11,
+		);
+		$form['authorized_no'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Authorization Code'),
+			'#required' => TRUE,
+			'#default_value' => $autorizedno,
+			'#element_validate' => array('_authorized_no_validate'),
+			'#maxlength' => 6,
+
+		);
+		$form['trans_no'] = array(
+			'#type' => 'textfield',
+			'#title' => t('MIGS Transaction Number'),
+			'#required' => TRUE,
+			'#default_value' => $transactionno,
+			'#element_validate' => array('_trans_no_validate'),
+			'#maxlength' => 10,
+		);
+		$form['receipt_no'] = array(
+			'#type' => 'textfield',
+			'#title' => t('Merchant Transaction Reference'),
+			'#required' => TRUE,
+			'#default_value' => $receiptno,
+			'#element_validate' => array('_receipt_no_validate'),
+			'#maxlength' => 12,
+		);
+		
+		$form['submit'] = array(
+			'#type' => 'submit',
+			'#value' => t('Save'),
+		);
+		return $form;
+//	}
+}
+
+function _migs_manual_update_form_submit($form, $form_state){
+	// echo drupal_set_message($form_state['values']['hsbc_migs_id']);
+	
+	db_update('uc_hsbc_migs')
+		->fields( array(
+			'authorized_no' => $form_state['values']['authorized_no'],
+			'trans_no' => $form_state['values']['trans_no'],
+			'receipt_no' => $form_state['values']['receipt_no'],
+		)
+		)
+		->condition('hsbc_migs_id', $form_state['values']['hsbc_migs_id'])
+		->execute();
+
+	// drupal_set_message(arg(3));
+	if(trim(arg(3)) == 'store'){
+		header('Location: /admin/store/orders/view');
+		exit;
+	}elseif(is_numeric(trim(arg(3)))){
+		// http://beta.smappliance.com/admin-dashboards?qt-admin_dashboard=1#qt-admin_dashboard
+		header('Location: /admin-dashboards?qt-admin_dashboard=1#qt-admin_dashboard');
+		exit;
+	}
+	// admin/store/orders/view
+}

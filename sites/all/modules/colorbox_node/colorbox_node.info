@@ -1,0 +1,11 @@
+name = "Colorbox Node"
+description = "Displays a node inside a colorbox without the header and the footer."
+core = "7.x"
+package = "colorbox"
+dependencies[] = "colorbox"
+; Information added by drupal.org packaging script on 2012-05-21
+version = "7.x-1.0"
+core = "7.x"
+project = "colorbox_node"
+datestamp = "1337566854"
+

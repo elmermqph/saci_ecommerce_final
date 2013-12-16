@@ -1,0 +1,26 @@
+.messages.error, p#cart-form-pane{
+display:none;
+}
+
+.messages.error.warning{
+display:block;
+}
+
+p#cart-form-pane{
+background:none;
+border:none;
+}
+
+#cart-form-pane td.price,
+#uc-cart-view-form .uc-price,
+#uc-cart-view-form .product-info{
+text-align: right !important;
+}
+
+#pid-cart #content-messages, 
+#pid-cart #content-messages-inner{
+display:block;
+}
+#content-messages-inner .messages.status{
+display:none;
+}

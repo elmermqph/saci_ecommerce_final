@@ -1,0 +1,49 @@
+<?php
+
+function textfile_upload_permission(){
+  return array(
+    'Access Text file upload' => array(
+      'title' => t('Access Text file upload'), 
+      'description' => t('Perform Text file upload.'),
+      'restrict access' => TRUE,
+    ),
+  );
+}
+
+function textfile_upload_menu(){
+	$items = array();
+	$items['admin/textfile_upload'] = array(
+		'title' => 'Text file upload',
+		'description' => 'Text file upload module',
+		'page callback' => 'textfile_upload_settings',
+		'access callback' => 'user_access',
+		'access arguments' => array('Access Text file upload'),
+	);
+	return $items;
+}
+	
+function textfile_upload_settings(){
+	return drupal_get_form('textfile_upload_form');
+}
+
+function textfile_upload_form($node, &$form_state) {
+	$form['upload-field'] = array(
+	  '#type' => 'file',
+	  '#title' => t('Upload text file'),
+	  '#size' => 40,
+	);
+	$form['submit'] = array(
+		 '#type' => 'submit',
+		 '#value' => 'submit'
+	);
+
+    return $form;
+}
+
+function textfile_upload_submit($form, &$form_state){
+    $tfu_values = $form_state['values'];
+	$tfu_upload_file = $tfu_values['upload-field'];
+
+	drupal_set_message("Submitted");
+}
+?>
