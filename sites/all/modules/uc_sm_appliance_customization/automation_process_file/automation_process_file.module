@@ -473,13 +473,23 @@ function outbound_mms_file($dategenerate,$cron_fetch=""){
 		File Path Process;
 	*/
 	$sequence_limit_db = 999;
+	
+	/*
+		View query on this view on this url 	<SM APPLIANCE Website> /admin/structure/views/view/list_of_transaction/edit
+	*/
+	
 	$view = views_get_view('list_of_transaction');
     $view->set_display('page_invoice_only');
     $view->exposed_input['created']['value']['date'] = $dategenerate;
    	$view->render();
     $array = $view->result;
+	
+	//if there's no invoice
 	if(count($array)==0){
 				if($cron_fetch!=""){
+					/*
+						Email template and generate drupal_mail
+					*/
 					$message = drupal_mail('mms_generator', 'key', EMAIL_MMS_OUTBOUND_TO, language_default(), array(), null, FALSE);
 					$message['from'] = "STAR APPLIANCE CENTER INC. no-reply@smappliance.com";
 					$message['subject'] = "[T1 Outbound File] No Transaction file as of ".date("F d, Y",strtotime($dategenerate));
@@ -499,12 +509,18 @@ function outbound_mms_file($dategenerate,$cron_fetch=""){
 					"message"=>"NO Transaction for date: ".date("F d,Y",strtotime($dategenerate)));
 				}
 	}else{
+		/*
+			generate variable
+		*/
 		$startdate = strtotime($dategenerate." ".date("g:i:s"));
 		$default_generate = array(
 			'selling_date' => date("ymd",strtotime($dategenerate)),
 			'branch_code_4' => 0423,
 			'company_code' => 037
 		);
+		/*
+			format on sequence on filename
+		*/
 		$checktablecount = db_select("uc_sequence_mms","usm")->fields("usm",array("id"))->execute()->rowCount();
 		if($sequence_limit_db == $checktablecount){
 			db_query("TRUNCATE TABLE {uc_sequence_mms}");
@@ -519,7 +535,11 @@ function outbound_mms_file($dategenerate,$cron_fetch=""){
 		*/
 		//$format_file = "T1".$default_generate['selling_date'].".".str_pad($fetch_sequence_id, 3, "0", STR_PAD_LEFT).".".$default_generate['company_code'].$default_generate['branch_code_4'];
 		//str_pad($fetch_sequence_id, 3, "0", STR_PAD_LEFT)".."
+		
+		//filename format
 		$format_file = "T1".$default_generate['selling_date'].".001."."0370423";
+		
+		//process the array and convert file
 		$mms_generate = generate_outbound_mms_file($array,$dategenerate,$format_file);
 		if($mms_generate['status']==false){
 			return array("status"=>false,"message"=>"Fail ".$mms_generate['message']);
@@ -563,6 +583,9 @@ function outbound_mms_file($dategenerate,$cron_fetch=""){
 	}
 }
 function generate_outbound_mms_file($array,$dategenerate,$file_format){
+	/*
+		General variable
+	*/
 	$totalvalue = 0;
 	$totalcountrow = 0;
 	$file_include = MMS_FILE_PATH_ROOT.drupal_get_path('module','mms_generator').'/object/classoutput.php';
@@ -582,11 +605,18 @@ function generate_outbound_mms_file($array,$dategenerate,$file_format){
 	$write_content = "";
 	$sequence = 1;
 	$limit_sequence =497;
+	
+	
 	foreach($array as $value):
+		//order info ubercart module function
 		$order = uc_order_load($value->order_id);
+		
+		//get order total cost
 		$totalvalue += $order->order_total;
 		foreach($order->products as $order_value):
+			//get the barcode
 			$upc_barcode = db_select("field_data_field_barcode","fdfb")->fields("fdfb",array('field_barcode_value'))->condition("fdfb.entity_id",$order_value->nid)->execute()->fetchField();
+			//set format on t1 file on product
 			if($upc_barcode):
 				$transaction_total_qty += $quantity_convert = ($order_value->qty*$default_generate['format_multiple']);
 				$price_convert = (number_format($order_value->price,2,'.','')*$default_generate['format_multiple']);
@@ -601,6 +631,8 @@ function generate_outbound_mms_file($array,$dategenerate,$file_format){
 			endif;
 		endforeach;
 	endforeach;
+	
+	//Set format on t1 file on total template
 	$write_content .= "0423/".$default_generate['selling_date']."/1/0/1/".str_pad((int)$sequence, 3, "0", STR_PAD_LEFT)."/000/04/CA/810/0/".$transaction_total_price."/+/////0/////".$default_generate['next_line'];
 	$write_content .= "0423/".$default_generate['selling_date']."/1/0/1/000/000/03/01/810/0/111111/0423/PHP/0//0////0//0///////".$default_generate['selling_date']."/".$default_generate['next_line'];
 	$write_content .= "0423/".$default_generate['selling_date']."/1/9/0/000/000/11/5001//CA/".$transaction_total_price."/+/////".$default_generate['next_line'];
@@ -611,11 +643,15 @@ function generate_outbound_mms_file($array,$dategenerate,$file_format){
 		"DOS"=> $write_content,
 		"LOG"=> number_format($transaction_total_qty / $default_generate['format_multiple'],3,'.','').",".number_format($transaction_total_price / $default_generate['format_multiple'],3,'.','')
 	);
+	
+	//convert all the value on write on file.
 	foreach($formating as $key_type => $value_format){
 		$fp = fopen($tempdosfilepath.$file_format.".".$key_type, 'w');
 		fwrite($fp,$value_format);
 		fclose($fp);
 	}
+	
+	//set on array to compress
 	$file_status_active = true;
 	foreach($formating as $key_type => $value_format){
 		if(!file_exists($tempdosfilepath.$file_format.".".$key_type)){
@@ -625,6 +661,7 @@ function generate_outbound_mms_file($array,$dategenerate,$file_format){
 		}
 	}
 	if($file_status_active == true){
+			//compress on a zip file
 			$zipfile = $filepath.$file_format.".zip";
 			if(file_exists($zipfile)){
 				if(unlink($zipfile))

@@ -6,13 +6,27 @@ class MMS_CLASS
 	public function file_save_to_server($fileset){
 		
 		foreach ($fileset as $key => $arrayfieldcron):
-			if($key=="tkstore"){
-				$arraycheck = $this->tk_store_array($arrayfieldcron);
-				$this->tk_store_array_db($arraycheck[$key]);
+			/*
+				loop that will process file based on array key
+			*/
+			if($key=="sacistore"){
+				/*
+					Beggining invetory file process
+				*/
+				$arraycheck = $this->saci_store_array($arrayfieldcron);
+				$this->saci_store_array_db($arraycheck[$key]);
 			}else if($key=="qtyupdate"){
+				/*
+					inventory update
+				*/
 				$arraycheck = $this->sku_update_array($arrayfieldcron);
 				$this->sku_update_array_db($arraycheck[$key]);
 			}else{
+				/*
+					XML related update
+						- (MMS)item master file
+						- SKU Update
+				*/
 				foreach($arrayfieldcron as $arraymainvalue){
 					$arraycheck = $this->file_to_array($arraymainvalue);
 					//if($key=="itemprice")
@@ -97,7 +111,7 @@ class MMS_CLASS
 			}
 		}
 		closedir($handle); 
-		$arraynatureorder = array('item','ean','itemprice','itemdescr','tkstore','qtyupdate');
+		$arraynatureorder = array('item','ean','itemprice','itemdescr','sacistore','qtyupdate');
 		foreach($arraynatureorder as $value){
 			if(isset($filesystemcheck[$value])){
 				$ordervalue[$value] = true;
@@ -175,6 +189,9 @@ class MMS_CLASS
 			itemprice = update price
 	*/
 	private function file_to_array($fileset){
+		/*
+			Load XML 
+		*/
 		$xml = simplexml_load_file($fileset);
 		foreach($xml->children() as $firstparent):
 			$keybasedept = "";
@@ -187,10 +204,16 @@ class MMS_CLASS
 				}
 				switch ($secondkey) {
 					case "item":
+						/*
+							get tree "ITEM"  get all the ff
+								- Attributes intcode
+								- Elements price
+								- Elements descritm
+						*/
 						$attributedept = $secondparent->attributes();
 						$adept[$secondkey][$seconparentcount] = array('intcode' => (string)$attributedept['intcode']);
 						/*
-							,'storeid' => 	$attributedept['storeid']->__toString(),'itemtype' => $attributedept['itemtype']->__toString(),'additemtype' => $attributedept['additemtype']->__toString(),'alpha_code' => $attributedept['alpha_code']->__toString(),'supplier_code' => $attributedept['supplier_code']->__toString()
+							,'storeid' => 	$attributedept['storeid']->__toString(),'itemtype' => $attributedept['itemtype']->__toString(),'additemtype' => $attributedept['additemtype']->__toString() ,'alpha_code' => $attributedept['alpha_code']->__toString(),'supplier_code' => $attributedept['supplier_code']->__toString()
 						
 						*/
 						foreach($secondparent as $thirdkey => $parentvalue):
@@ -233,6 +256,12 @@ class MMS_CLASS
 							}
 						endforeach;
 					break;
+					/*
+							get tree "ean"  get all the ff
+								- Attributes intcode
+								- Elements barcode
+								
+					*/
 					case "ean":
 						$attributedept = $secondparent->attributes();
 						$adept[$secondkey][$seconparentcount] = array('barcode' => (string)$attributedept['barcode']);
@@ -252,6 +281,15 @@ class MMS_CLASS
 							}
 						endforeach;
 					break;
+					/*
+							get tree "itemprice"  get all the ff
+								- Attributes intcode
+								- Elements priceamount
+								- Elements activedate
+								- Elements validdateto
+								
+								
+					*/
 					case "itemprice":
 						$attributedept = $secondparent->attributes();
 						$adept[$secondkey][$seconparentcount] = array('intcode' => (string)$attributedept['intcode']);
@@ -265,6 +303,11 @@ class MMS_CLASS
 							}
 						endforeach;
 					break;
+					/*
+							get tree "itemdescr"  get all the ff
+								- Attributes intcode
+								- Elements itemdescr1
+					*/
 					case "itemdescr":
 						$attributedept = $secondparent->attributes();
 						$adept[$secondkey][$seconparentcount] = array('intcode' => (string)$attributedept['intcode']);
@@ -286,10 +329,18 @@ class MMS_CLASS
 		getting array in this function file_to_array() saving to datebase 
 	*/
 	private function file_to_array_db($key,$value){
+		/*
+				note: db_query is an drupal default function.
+				purpose: the get the node id on the product table using sku id.
+		*/
 		$object = db_query("SELECT nid FROM uc_products WHERE model = :model",array(':model' => $value['intcode']));
 		$record = $object ->fetchObject();  
+		
 		switch ($key) {
 			case "item":
+				/*
+					Add item on xml tree "item"
+				*/
 				if(isset($record->nid)):
 					$newNode = node_load($record->nid);
 					$newNode->nid = $record->nid;	
@@ -328,6 +379,9 @@ class MMS_CLASS
 				}
 			break;
 			case "ean":
+				/*
+					Get the product and save the barcode.
+				*/
 				$newNode = node_load($record->nid);
 				$newNode->changed = strtotime("now");
 				$newNode->field_barcode['und'][0]['value'] = $value['barcode'];
@@ -338,6 +392,9 @@ class MMS_CLASS
 			break;
 			case "itemprice":
 				if(isset($record->nid)){
+					/*
+						Log the new price on z_price_update you can see this in dashboard "SKU Scheduler"
+					*/
 					$priceupdateinsert = db_insert('z_price_update')
 						->fields(
 							array(
@@ -371,6 +428,9 @@ class MMS_CLASS
 				}
 			break;
 			case "itemdescr":
+				/*
+					Get the product and save the name.
+				*/
 				if(isset($record->nid)){
 					$newNode = node_load($record->nid);
 					$newNode->changed = strtotime("now");
@@ -388,42 +448,73 @@ class MMS_CLASS
 	/*--------------------------------------------------------------------------------*/
 	/*
 		CONVERT TXTFILE TO ARRAY 
-		file TKSTORE________.TXT
+		file SACISTORE________.TXT
 		this are the ff VALUE GET ON TEXT FILE
 		intcode/sku
 		quantity
 			
 	*/
-	public function tk_store_array($myFile){
+	public function saci_store_array($myFile){
+		/*
+			READ the text file
+		*/
 		$fh = fopen($myFile, 'r');
 		$theData = fread($fh,filesize($myFile));
 		fclose($fh);
+		/*
+			Convert it to array
+		*/
 		$print = explode("\n",$theData);
+		/*
+			Re-orgainize by this format
+				sacistore
+					1
+						- intcode
+						- qty
+					2
+						- intcode
+						- qty
+		*/
 		foreach($print as $key => $value){
 			$explode = explode("    ",trim($value));
 			if($explode[0]!="")
-				$fetch['tkstore'][$key]['intcode'] = $explode[0].$this->suffixvalue;
+				$fetch['sacistore'][$key]['intcode'] = $explode[0].$this->suffixvalue;
 			if($explode[0]!="")	
-				$fetch['tkstore'][$key]['qty'] = $explode[1];
+				$fetch['sacistore'][$key]['qty'] = $explode[1];
 		}
 		return $fetch;
 	}
 	/*--------------------------------------------------------------------------------*/
 	/*
 		SAVE ARRAY ON DATABASE
-		getting array in this function tk_store_array() saving to datebase 
+		getting array in this function saci_store_array() saving to datebase 
 			
 	*/
-	private function tk_store_array_db($array){
+	private function saci_store_array_db($array){
+		
 		foreach($array as $value):
+			/*
+				note: db_query is an drupal default function.
+				purpose: the get the node id on the product table using sku id.
+			*/
 			$object = db_query("SELECT nid FROM uc_products WHERE model = :model",array(':model' => $value['intcode']));
 			$record = $object ->fetchObject(); 
+			
 			if(isset($record->nid)){
+				/*
+					if exist it will search the product stock details on uc_product_stock table. 				
+				*/
 				$ucproductstock = db_query("SELECT nid FROM uc_product_stock WHERE sku = :sku AND nid = :nid",array(':sku' => $value['intcode'],':nid' => $record->nid));
 				$recordstock = $ucproductstock ->fetchObject(); 
 				if(isset($recordstock->nid)){
+					/*
+						if the product exist it will update it.
+					*/
 					$stock = db_update('uc_product_stock')->fields(array('sku' => $value['intcode'],'nid' => $record->nid,'active' => 1,'stock' => $value['qty'],'threshold' => 0))->condition('sku', $value['intcode'])->condition('nid', $record->nid)->execute();
 				}else{
+					/*
+						if not it will insert line entry
+					*/
 					$stock = db_insert('uc_product_stock')->fields(array('sku', 'nid', 'active', 'stock', 'threshold'))->values(array('sku' => $value['intcode'],'nid' => $record->nid,'active' => 1,'stock' => $value['qty'],'threshold' => 0))->execute();
 				}
 			}
@@ -432,10 +523,31 @@ class MMS_CLASS
 	}
 	/*--------------------------------------------------------------------------------*/
 	private function sku_update_array($myFile){
+		/*
+			READ the text file
+		*/
 		$fh = fopen($myFile, 'r');
 		$theData = fread($fh,filesize($myFile));
 		fclose($fh);
+		/*
+			Convert it to array
+		*/
 		$print = explode("\n",$theData);
+		/*
+			Re-orgainize by this format
+				sacistore
+					1
+						- intcode = get the last 10
+						- transcode = get the 3 digit after first 6 string
+						- stock
+						
+				example
+					121112041010146756
+					 - incode = 10146756
+					 - transcode = 041
+				
+					
+		*/
 		foreach($print as $key => $value):
 			$explode = explode(" ",trim($value));
 			$typekey = 1;
@@ -443,7 +555,7 @@ class MMS_CLASS
 				if($mainvalue!=""):
 					if($typekey==1){
 						$fetch['qtyupdate'][$key]['intcode'] = substr($mainvalue, 10).$this->suffixvalue;
-						$fetch['qtyupdate'][$key]['tanscode'] = substr($mainvalue, 6,3);
+						$fetch['qtyupdate'][$key]['transcode'] = substr($mainvalue, 6,3);
 					}else if($typekey==2)
 						$fetch['qtyupdate'][$key]['stock'] = $mainvalue;
 					$typekey++;
@@ -455,26 +567,42 @@ class MMS_CLASS
 	private function sku_update_array_db($array){
 		$transacodecheck = array("031"=>1,"041"=>1,"042"=>-1,"051"=>-1,"061"=>1,"062"=>-1);
 		foreach($array as $key => $value):
+			/*
+				note: db_query is an drupal default function.
+				purpose: the get the node id on the product table using sku id.
+			*/
 			$object = db_query("SELECT nid FROM uc_products WHERE model = :model",array(':model' => $value['intcode']));
 			$record = $object ->fetchObject(); 
 			if(isset($record->nid)){
+				/*
+						if exist it will search the product stock details on uc_product_stock table. 			
+				*/
 				$ucproductstock = db_query("SELECT nid,stock,sku FROM uc_product_stock WHERE sku = :sku AND nid = :nid",array(':sku' => $value['intcode'],':nid' => $record->nid));
 				$recordstock = $ucproductstock->fetchObject(); 
 				if(isset($recordstock->nid)){
-					if(isset($transacodecheck[$value['tanscode']])){
-						if($transacodecheck[$value['tanscode']]<0){
+					/*
+						check transcode what operator will use add/deduct.
+					*/
+					if(isset($transacodecheck[$value['transcode']])){
+						
+						if($transacodecheck[$value['transcode']]<0){
 							if($value['stock']<0){
 								$expressionvalue = $value['stock'];
 							}else{
-								$expressionvalue = $value['stock'] * $transacodecheck[$value['tanscode']];
+								$expressionvalue = $value['stock'] * $transacodecheck[$value['transcode']];
 							}
 						}else{
-							$expressionvalue = $value['stock'] * $transacodecheck[$value['tanscode']];
+							$expressionvalue = $value['stock'] * $transacodecheck[$value['transcode']];
 						}
 					}else{
 						$expressionvalue = $value['stock'];
 					}
+					
+					
 					$totalstock = ($recordstock->stock)+($expressionvalue);
+					/*
+						update the stock
+					*/
 					$stock = db_update('uc_product_stock')
 					->fields(
 						array(
@@ -489,6 +617,9 @@ class MMS_CLASS
 						->condition('nid', $recordstock->nid)
 						->execute();
 				}else{
+					/*
+						insert the stock
+					*/
 					$stock = db_insert('uc_product_stock')
 						->fields(
 							array(

@@ -10,9 +10,19 @@ define("EMAIL_NOTIFY",variable_get('csa_outbound_email_to',"p.ferrer@spinweb.ph,
 ,Edgardo.F.Gutierrez@smretail.com,Edgardo.F.Gutierrez@gmail.com
 */
 function generate_day_cron_check(){
+	
+	/*
+		GENERAL VARIABLES
+	*/
 	$filepath =   MMS_FILE_PATH_ROOT."sites/default/files/mms_path/";
 	$filesystemcheck = array();
 	$filesystemcheck = array('item'=>array(),'ean'=>array(),'itemprice'=>array(),'itemdescr'=>array());
+	/*
+		Check all file on $filepath diretory and categorize it by array
+		example array.
+			key | path
+			item | $filepath/ID0370423122612.001
+	*/
 	if ($handle = opendir($filepath)) {
 		while (false !== ($file = readdir($handle))) { 
 			if ($file != "." && $file != "..") {
@@ -22,7 +32,7 @@ function generate_day_cron_check(){
 					}else if(strpos($file,".txt")>0 || strpos($file,".TXT")>0){
 						$str = substr($file,0,2);
 						if($str=="sa"){
-							$filesystemcheck['tkstore'] = $filepath.$file;
+							$filesystemcheck['sacistore'] = $filepath.$file;
 						}else{
 							$filesystemcheck['qtyupdate'] = $filepath.$file;
 						}
@@ -43,7 +53,10 @@ function generate_day_cron_check(){
 		}
 	}
 	closedir($handle); 
-	$arraynatureorder = array('item','ean','itemprice','itemdescr','tkstore','qtyupdate');
+	/*
+		Set array in order 'item','ean','itemprice','itemdescr','sacistore' and 'qtyupdate'
+	*/
+	$arraynatureorder = array('item','ean','itemprice','itemdescr','sacistore','qtyupdate');
 	foreach($arraynatureorder as $value){
 		if(isset($filesystemcheck[$value])){
 			$ordervalue[$value] = $filesystemcheck[$value];
@@ -56,10 +69,18 @@ function generate_day_cron_check(){
 }
 
 function generate_mms_form($arraypath){
+
 	require_once("object/classoutput.php");
+	/*
+		Process it into raw file to drupal database	
+	*/
 	$object = new MMS_CLASS;
 	$return = $object->file_save_to_server($arraypath);
+	
 	if($return==TRUE){
+		/*
+			After processing it delete it in temporary file location
+		*/
 		foreach ($arraypath as $value){
 			if(is_array ($value)){
 				foreach($value as $subvalue)
@@ -74,16 +95,26 @@ function generate_mms_form($arraypath){
 }
 
 function transfer_file($arraypath){
+	/*
+		variable_get() is a function of core drupal that makes general variable you research it for more info.
+		You Can find the value of this under dashboad "ADMIN SETTINGS"
+	*/
 	require_once("object/classoutput.php");
 	$object = new MMS_CLASS;
 	
 	
 	$filepath =  MMS_FILE_PATH_ROOT;
-	//$storageinboundfile = "inbound/";
+	
+	/*
+		GENERARAL PATH VAIRABLE
+	*/
 	$storageinboundfile = variable_get('folder_inbound',"inbound/");
 	$tempstorage = "/sites/default/files/mms_path";
 	$ziptempstorage = "/sites/default/files/temp_xml";
 	$daybefore =  strtotime("-1day");
+	/*
+		Determine What Function use
+	*/
 	switch($arraypath){
 		case "itemmasterfile":
 			$casezip = str_replace("[mdy]", date("mdy",$daybefore), variable_get('itemmasterfile','ID0370423[mdy]')).".zip";
@@ -93,7 +124,7 @@ function transfer_file($arraypath){
 			$casezip = str_replace("[mdy]", date("mdy",$daybefore), variable_get('skuupdate','IF0370423[mdy]')).".zip";
 			$filetype = "zip";
 		break;
-		case "tkstore":
+		case "sacistore":
 			$casezip = str_replace("[mdy]", date("mdy",$daybefore), variable_get('tkstore','sacistore[mdy]'));
 			$filetype = "txt";
 		break;
@@ -104,6 +135,14 @@ function transfer_file($arraypath){
 		
 		
 	}
+	
+	/*
+		If Zip 
+			- Extract it on a file and store it in $filepath.$ziptempstorage variable Then clean the unecessary xml tags and put on a temp storage container.
+		If Text
+			- Put it on Temp Storage Container.
+	*/
+	
 	switch($filetype){
 		case "zip":
 			$zip = new ZipArchive;
@@ -249,6 +288,9 @@ function csa_file_name($csafilename,$datenow,$cron="",$checksmoutbound=""){
 function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
 	global $base_root;
 	$filenamecheck = "C0370423".date("mdy",strtotime($dateformat))."1";
+	/*
+		View query on this view on this url 	<SM APPLIANCE Website> /admin/structure/views/view/list_of_transaction/edit
+	*/
 	$view = views_get_view('order_productlist'); 
 	$view->set_display('page_validation_result'); 
 	$view->exposed_input['created']['value']['date'] = $dateformat;
@@ -256,8 +298,12 @@ function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
 	$view->render();
 	$statusreturn = array();
 	$completegeneratereport = false;
+	
 	while($completegeneratereport == false){
 		if(count($view->result)>0){
+			/*
+			
+			*/
 			$statusprint =  csa_file_name($filenamecheck,$dateformat,$cron,$checksmoutbound);
 			if($statusprint=="Complete"){
 				if(file_exists($_SERVER['DOCUMENT_ROOT']."/outbound/zip_file/".$filenamecheck.".zip")){

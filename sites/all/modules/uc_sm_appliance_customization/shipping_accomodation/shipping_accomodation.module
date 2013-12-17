@@ -645,6 +645,9 @@ function download_order_bdo(){
 }
 
 function tracking_2go($date){
+		/*
+			Check CSV is file
+		*/
 		$filename = MMS_FILE_PATH_ROOT.variable_get('folder_2go_csv','2GO/csv/').INBOUND_2GO_PREFIX.$date.".csv";
 		if (($handle = fopen($filename, 'r')) !== FALSE){
 			$row = 1;
@@ -652,6 +655,9 @@ function tracking_2go($date){
 				if($row>1){
 						$pos = strpos($data[1], SACI_PREFIX);
 						if ($pos !== false) {
+							/*
+								Get the awb number and insert in this function
+							*/
 							$status = (empty($data[2]))?0:$data[2];
 							tracking_2go_generate($data[1],$data[0],$status);
 						}else{
@@ -674,24 +680,44 @@ function tracking_2go($date){
 }
 
 function tracking_2go_generate($sales_invoice,$awb,$status_number=0){
+	//trim the invoice format to become invoice id
 	$si_id = ltrim(str_replace(SACI_PREFIX,"",$sales_invoice), '0');
+	
+	//search on table invoice
 	$order_id_main = db_query("SELECT order_id FROM {checkout_vat_inc} WHERE id = :id", array(':id' => $si_id))->fetchField();
+	
+	
 	if($order_id_main){
+		//Variable for delivery status
 		$deliverystatus = array("for_delivery","delivered","in_transit","unknown_consignee","bad_address","refused_to_accept","hold_cargo","business_close","return_to_sender","consignee_not_around");
+		
+		//get order info uc_order_load() is ubercart module function
 		$order = uc_order_load($order_id_main);
+		
+		//check tracking number on database
 		$tracking_number = db_query("SELECT tracking_number FROM {uc_shipments} WHERE order_id = :id", array(':id' => $order_id_main))->fetchField();
+		
+		
 		if(empty($tracking_number)){
+			//add tracking number on this function
 			awb_number_2go($order_id_main,$awb);
+			
+			//set message
 			$message = "SALES INVOICE: @sales_invoice has changed Delivery Status to: @order_status";
 		}else{
 			$generate = db_update("uc_shipments")
 			->fields(array('tracking_number'=>$awb))
 			->condition('order_id',$order_id_main)
 			->execute();
+			
+			//set message
 			$message = "SALES INVOICE: @sales_invoice has changed update awb number";
 		}
+		
+		//update order/delivery status
 		$order->order_status = $deliverystatus[$status_number];
 		uc_order_save($order);
+		//
 		$order_status = db_query("SELECT title FROM {uc_order_statuses} WHERE order_status_id = :status", array(':status' => $deliverystatus[$status_number]))->fetchField();
 		watchdog("cron",$message,array('@sales_invoice'=>$sales_invoice,'@order_status'=>$order_status),WATCHDOG_NOTICE);
 	}else{
@@ -702,9 +728,15 @@ function tracking_2go_generate($sales_invoice,$awb,$status_number=0){
 }
 
 function awb_number_2go($order_id_main,$awb){
+	//get order info uc_order_load() is ubercart module function
 	$order = uc_order_load($order_id_main);
+	
+	//check awb number or order id
 	$package_id = db_query("SELECT package_id FROM {uc_packages} WHERE order_id = :id", array(':id' => $order_id_main))->fetchField();
+	
+	//this function is template for adding tracking number on this function uc_shipping_shipment_save() you can research this for more details
 	if(!$package_id){
+	
 		$package = array();
 		foreach ($order->products as $id=>$product) {
 			$package['products'][$id] = $product;
@@ -825,21 +857,37 @@ function page_cron_bdo(){
 }
 
 function bdo_checker($date=""){
+		/*
+			Check CSV is file
+		*/
 		$filename = MMS_FILE_PATH_ROOT."/".variable_get('folder_bdo','bdo/').BDO_PREFIX.$date.".csv";
 		if (($handle = fopen($filename, 'r')) !== FALSE){
 			$row = 1;
 			while (($data = fgetcsv($handle, 0, ",")) !== FALSE) {
 				if($row>=7 && $data[4]!="TOTAL")
+					/*
+						Get the row 12 and get the cdv number and pass on function
+					*/
 						print cdv_ready($data[12]);
 						//print_r($data[12]);
 				$row++;
 			}
 			fclose($handle);
+			/*
+				Message email if there's a bdo transaction
+			*/
 			$message_email = 'BDO Remittance csv file was successfully uploaded.';
     	}else{
+			/*
+				Message email if there's a no bdo transaction
+			*/
 			watchdog("cron","No BDO Transaction Found",array(),WATCHDOG_NOTICE);
 			$message_email = 'No BDO Remittance csv file received today.';
 		}
+		/*
+			variable template format for drupal_mail its a hook function default by drupal
+		*/
+		
 		$email = EMAIL_BDO_TO;
 		$module = 'shipping_accomodation';
 		$key = 'key';
@@ -871,19 +919,37 @@ function bdo_checker($date=""){
 
 function cdv_ready($cdv){
 	global $user;
+	/*
+		Get order on CDV variable
+	*/
     $query = db_select("sandcart_payment_bdo","spo")
 	->fields('spo',array('order_id','bdo_smac'))
 	->condition('spo.bdo_cdv',$cdv)
 	->execute();
+	
+	/*
+		if the order id exist
+	*/
 	if($query->rowCount()>0){
+		//Get the order id value object
 		$object_fetch = $query->fetchObject();
 		$order_id_bdo = $object_fetch->order_id;
+		//get the invoice number
 		$query_invoice = db_query("SELECT id FROM checkout_vat_inc WHERE order_id = :oid",array(':oid'=>$order_id_bdo));
+			//double check if the table isn't exist
 		if($query_invoice->rowCount()==0){
+			
+			//load order info uc_order_load() is ubecart module function
 			$order = uc_order_load($order_id_bdo);
+			
+			//load user info uc_order_load() is drupal default function
 			$userfetch = user_load($order->uid);
     		$tin = (isset($userfetch->field_tin['und']['0']['value']))?$userfetch->field_tin['und']['0']['value']:'---';
+			//get the smac number on this sandcart_payment_bdo on this transaction
     		$smacnumber = ($object_fetch->bdo_smac>0)?$object_fetch->bdo_smac:0;
+			/*
+				add invoice number
+			*/
 			$order_checkout= db_insert('checkout_vat_inc')
           		->fields(array(
 					'order_id' => $order->order_id,
@@ -895,10 +961,14 @@ function cdv_ready($cdv){
 					'tin'=>$tin
           		))
 			->execute();
+			
+			//change transaction and change payment_received
 			$order->order_status = "payment_received";
 			$order->field_complete_time['und'][0]['value'] = strtotime("now");
 			uc_order_save($order);
+			
 			if($order_checkout){
+				//Send email in drupal mail
 				$params = array('order' => $order,'oid' => $order->order_id);
 				drupal_mail(
 					'custom_login', 
@@ -909,6 +979,7 @@ function cdv_ready($cdv){
 					uc_store_email_from()
 				);		
 			}
+			//trigger the stock allocation complete
 			stock_allocation_validate("complete",$order_id_bdo);	
 		}
 	}
