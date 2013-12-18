@@ -1,4 +1,17 @@
 <?php 
+
+/*
+	Before you browse this module you mush have knowledge of the ff.
+		- how to use ubercart native function
+		- drupal default function
+			- node
+			- hooks
+			- taxonomy
+			- mail
+		- DOMPDF class library
+		- PHPExcel class library
+*/
+
 if(!defined("MMS_FILE_PATH_ROOT"))
 	define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
 if(!defined("BDO_PREFIX"))
@@ -73,8 +86,11 @@ function shipping_accomodation_permission(){
  *
  */
 
-
-function shipping_accomodation_menu(){
+/*
+	HOOK MENU pages its a drupal native function you can research it for more info.
+*/
+function shipping_accomodation_menu(){ 
+	
 	$items['dashboard/shipping_rate'] = array(
 		'title'=> 'Shipping Rate',
         'page callback' => 'category_price',
@@ -164,6 +180,7 @@ function shipping_accomodation_menu(){
 }
 
 function invoice_number_template($order_id){
+	//convert database id to invoice format.
 	$sales_invoice = db_select("checkout_vat_inc","cvi")->fields("cvi",array("id"))->condition("cvi.order_id",$order_id)->execute()->fetchField();
 	if($sales_invoice){
 		return "423-".str_pad((int)$sales_invoice, 10, "0", STR_PAD_LEFT);
@@ -175,13 +192,20 @@ function invoice_number_template($order_id){
 
 function export_location(){
 	$filepath = MMS_FILE_PATH_ROOT."sites/default/files/";
+	
+	//general variable
 	$filename = "export_2go_location.csv";
 	$csv_convertion[0] = array("Zone Code","Municipality Name","Municipality id","Barangay Name","Barangay id","Status");
+	
+	
+	//get all the barangay on datbase table
 	$query = db_select("uc_zones_barangay","uzb");
 	$query->join("uc_zones_municipality","uzm","uzm.id = uzb.uz_municipality");
 	$query->fields('uzb')
     ->fields('uzm',array("municipality_name","uz_zone"))
 	->orderBy("uzm.uz_zone","ASC");
+	
+	//convert it on array csv template
 	foreach($query->execute() as $value):
 		$csv_convertion[] = array(
 			$value->uz_zone,
@@ -195,6 +219,8 @@ function export_location(){
 	foreach ($csv_convertion as $fields) 
     	fputcsv($fp, $fields);
 	fclose($fp);
+	
+	//direct download format
 	header('Cache-Control: public');
 	header('Content-Type: text/csv');
 	header('Content-Disposition: attachment; filename="'.$filename.'"');
@@ -202,8 +228,13 @@ function export_location(){
 	die(); 	
 }
 
-
+/*
+	FORM API Template for Dashboard "Shipping Location"
+*/
 function awb_2go_location_form($form, &$form_submit) {
+		/*
+			
+		*/
 		$form['#attributes'] = array('enctype' => "multipart/form-data");
 		$form['location_export'] = array(
 			'#type' => 'markup',
@@ -227,8 +258,11 @@ function awb_2go_location_form($form, &$form_submit) {
 		return $form;
 		
 }
-
+/*
+	SCRIPT Upon Submission of Dashbaord "Shipping Location"
+*/
 function awb_2go_location_submit($form, &$form_submit) {
+	//this is native form api function of drupal its just get the uri of the file.
 	$file = file_save_upload('location_import', array(
 		'file_validate_extensions' => array('csv'), // Validate extensions.
 		FILE_EXISTS_REPLACE
@@ -236,6 +270,9 @@ function awb_2go_location_submit($form, &$form_submit) {
 	
 	$test = array();
 	$row = 1;
+	/*
+		its a script to check all rows.
+	*/
 	if (($handle = fopen($file->uri, 'r')) !== FALSE) {
 		while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
 			if($row != 1):
@@ -322,7 +359,9 @@ function awb_2go_location_submit($form, &$form_submit) {
 	}
 }
 
-
+/*
+	FORM API Template for dashboad "2go Outbound"
+*/
 function awb_2go_excel_form($form, &$form_submit) {
 	drupal_add_library('system','ui.datepicker');
   	drupal_add_js('jQuery(document).ready(function(){jQuery( ".pickadate" ).datepicker({
@@ -343,24 +382,38 @@ function awb_2go_excel_form($form, &$form_submit) {
 		
 }
 
+/*
+	SCRIPT Upon Submission of Dashbaord "2go Outbound"
+*/
+
 function awb_2go_excel_submit($form, &$form_submit){
+	
 	excel_array_2go($form_submit['values']['report_date'],"download");
 }
 
 function excel_array_2go($dategenerate,$report_type=""){
+	
+	//filename variable
 	$excelfilename = OUTBOUND_2GO_PREFIX.$dategenerate.".xls";
+	
+	//Donation Transaction List View
 	$view = views_get_view('awb_2go');
     $view->set_display('page');
     $view->exposed_input['created']['value']['date'] = $dategenerate;
    	$view->render();
     $array = $view->result;
+	
+	
 	if(count($array)>0){
+		//if there's a transaction this function will get all the transaction and convert it to raw file.
 		$htmlpath = excel_2go($array,$dategenerate);
 		$message_email = '2GO AWB template was successfully uploaded to the FTP folder.';
 	}else{
 		$message_email = 'No transactions for today.';
 	}
 	if($report_type==""){
+		
+		//if the function called by cron file it will generate a email
 		$email = EMAIL_2GO_TO;
 		$module = 'shipping_accomodation';
 		$key = 'key';
@@ -384,6 +437,7 @@ function excel_array_2go($dategenerate,$report_type=""){
 		// Send e-mail.
 		if($system->mail($message)){}
 	}else{
+		//if this function called by dashboard it will set a direct download
 		 if(count($array)>0){
 			header("Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 			header("Content-Disposition: attachment;filename=".$htmlpath['filename']);
@@ -396,6 +450,9 @@ function excel_array_2go($dategenerate,$report_type=""){
 	}
 }
 function excel_template_product($array_product,$template=""){
+	/*
+		its a function the template of 2go outbound.
+	*/
 	$result = ($template=="qty")?0:"";
 	switch($template){
 		case "qty":
@@ -417,14 +474,24 @@ function excel_template_product($array_product,$template=""){
 }
 
 function excel_2go($array_elements,$dategenerate){
+	//Variable for filename template
 	$filepath = MMS_FILE_PATH_ROOT.variable_get('folder_2go_xls','2go/xls/');
     $excelfilename = OUTBOUND_2GO_PREFIX.$dategenerate.".xls";
-	if(file_exists())
+	
+	//if the file exist it will delete on the path.
+	if(file_exists($filepath.$excelfilename))
 		unlink($filepath.$excelfilename);
+		
+	//get all the transaction on array variable.
 	$key_row_value = 3;
 	foreach($array_elements as $value){
+		//get order info uc_order_load() is ubercart module function	
 		$order = uc_order_load($value->order_id);
+		
+		//get the province of specific order.
 		$uc_zone_name = db_select("uc_zones","uz")->fields("uz",array("zone_name"))->condition("uz.zone_id",$order->delivery_zone)->execute()->fetchField();
+		
+		//convert all the info in PHPExcel array template.
 		$array_fetch_element[$key_row_value]['B'.$key_row_value] = $order->delivery_first_name." ".$order->delivery_last_name;
 		$array_fetch_element[$key_row_value]['C'.$key_row_value] = $order->delivery_street1." ".$order->delivery_street2 ." ".$order->delivery_city." ".$uc_zone_name;
 		$array_fetch_element[$key_row_value]['H'.$key_row_value] = excel_template_product($order->products);
@@ -441,10 +508,13 @@ function excel_2go($array_elements,$dategenerate){
 		'V1' => 'CNEE_CUST','W1' => 'CNEE_C/O','X1' => 'BOOKING #','L2' => 'L','M2' => 'W','N2' => 'H'
 	);
 	
+	
 	$excel_php = $_SERVER['DOCUMENT_ROOT'] . '/' . drupal_get_path('module','mms_generator') . '/excel/PHPExcel.php';
 	require_once($excel_php);
 	$io_factory = $_SERVER['DOCUMENT_ROOT'] . '/' . drupal_get_path('module','mms_generator') . '/excel/PHPExcel/IOFactory.php';
 	require_once($io_factory);
+	
+	
 	$objPHPExcel = new PHPExcel();
 	$sharedStyle1 = new PHPExcel_Style();
 	$activesheet = $objPHPExcel->getActiveSheet();
@@ -454,7 +524,6 @@ function excel_2go($array_elements,$dategenerate){
     /*END SET STYLE AND BORDER */
     /*INSERT ELEMENT*/
 	//$excelettercheck[(count($array)+1)].
-	
 	$activesheet->setSharedStyle($sharedStyle1, "A1:"."X".(2+count($array_fetch_element)));
 	$activesheet->mergeCells('L1:N1');
 	foreach($array_header as $header_column => $header_value):
@@ -483,22 +552,41 @@ function excel_2go($array_elements,$dategenerate){
 
 
 
-
+/*
+	This is a hook alter submission of drupal.
+		purpose: it triggers category_shipping_rate function in the ff. condition
+			- Taxonomy term form page.
+			- The Vocabulary you're editing is "Category Management"
+			- You're Pressing Save Button.
+*/
 function shipping_accomodation_taxonomy_term_update($term){
+	
 	if($term->form_id == "taxonomy_form_term" && $term->vid==3 && $term->op == "Save")
 		category_shipping_rate($term->field_declare_shipping['und'][0]['value'],$term->tid,$term->parent[0]);
 }
 
+
+/*
+	The Features of this function is that once you change the rate of certain category it will affect the on the children price unless.
+		- the "Declare Shipping" is check
+*/
 function category_shipping_rate($declare_ship,$term_tid,$parent=""){
 	switch($declare_ship){
 		case 0:
 			if($parent>0){
+				//this is a drupal default function.
 				$parent_taxonomy = taxonomy_get_parents($term_tid);
+				//get all the value and place it on array
 				$parent_value = array(
 					'field_shipping_rate_price' => $parent_taxonomy[$parent]->field_shipping_rate_price['und'][0]['value'],
 					'field_sa_rate' => $parent_taxonomy[$parent]->field_sa_rate['und'][0]['value'],
 					'field_otd_rate' => $parent_taxonomy[$parent]->field_otd_rate['und'][0]['value']
 				);
+				
+				/*
+					load the term id you're editing.
+					its a drupal defaul function
+				*/
 				$term_load = taxonomy_term_load($term_tid);
 				$term_load->field_shipping_rate_price['und'][0]['value'] = $parent_value['field_shipping_rate_price'];
 				$term_load->field_sa_rate['und'][0]['value'] = $parent_value['field_sa_rate'];
@@ -508,14 +596,23 @@ function category_shipping_rate($declare_ship,$term_tid,$parent=""){
 			}
 		break;	
 		case 1:
+		
+			//get all the taxonomy info inorder(based how they order on taxonomy "Category Management")
 			$term_data_list = taxonomy_get_tree(3);
 			$value_view = false;
+			
 			foreach($term_data_list as $term_key => $term_value):
 				if($value_view == true):
+					/*
+						Load all the children on this loop
+						taxonomy_term_load() 
+					*/
 					$term_load = taxonomy_term_load($term_value->tid);
 					if($term_value->tid != $term_tid && $term_load->field_declare_shipping['und'][0]['value'] == 1)
 						break;
 					else{
+						
+						//save all the term.
 						$term_load->field_shipping_rate_price['und'][0]['value'] = $parentsrate['field_shipping_rate_price'];
 						$term_load->field_sa_rate['und'][0]['value'] = $parentsrate['field_sa_rate'];
 						$term_load->field_otd_rate['und'][0]['value'] = $parentsrate['field_otd_rate'];
@@ -523,6 +620,7 @@ function category_shipping_rate($declare_ship,$term_tid,$parent=""){
 					}
 				endif;
 				if($term_value->tid == $term_tid):
+					
 					$value_view = true;
 					$term_load = taxonomy_term_load($term_value->tid);
 					$parentsrate = array(
@@ -537,7 +635,9 @@ function category_shipping_rate($declare_ship,$term_tid,$parent=""){
 	print "Complete";
 }
 
-
+/*
+	Template function for dashboard "Shipping Rate"
+*/
 function category_price(){
 		$term_data_list = taxonomy_get_tree(3);
 		$depthline = "";
@@ -564,6 +664,10 @@ function category_price(){
 		return $html;
 }
 
+
+/*
+	For Redownload of invoice
+*/
 function download_invoice(){
 	global $user;
 	$arrayroles = array(3,14,19,12);
@@ -574,6 +678,9 @@ function download_invoice(){
 			$validationuser = true;
 	endforeach;	
 
+	/*
+		Checking what's specific role you're
+	*/
 	if($validationuser==false){
 		if(isset($_GET['title']) && isset($_GET['order_id'])){
 			$query_num = db_select("uc_orders","uo")
@@ -594,6 +701,10 @@ function download_invoice(){
 			die("ACCESS DENIED: INVALID PARAMETER");
 		}
 	}
+	
+	/*
+		if you're a valid user you can download it.
+	*/
 	if($validationuser == true){
 		$attachment_location = $_SERVER["DOCUMENT_ROOT"] . "/invoice/Sales Invoice_".$_GET['order_id'].".pdf";
 		if(!file_exists($attachment_location)){
@@ -613,12 +724,18 @@ function download_invoice(){
 	}
 }
 
-
+/*
+	for re-download of bdo transaction slip
+*/
 function download_order_bdo(){
 	global $user;
 	global $base_root;
 	$access_control = false;
+	/*
+		Checking what's specific role you're
+	*/
 	if(isset($_GET['order_id'])){
+		
 		$order = uc_order_load($_GET['order_id']);
 		$arrayroles = array(3,14,19,12);
 		foreach($arrayroles as $value):
@@ -627,6 +744,7 @@ function download_order_bdo(){
 				break;
 			}
 		endforeach;	
+		//if 
 		if($access_control==true || ($order->payment_method == "sandcart_payment" && $order->order_status=="pending" && $order->uid == $user->uid)){
 			$attachment_location = MMS_FILE_PATH_ROOT ."invoice/Order_Details_".$_GET['order_id'].".pdf";
 			if(!file_exists($attachment_location))
@@ -822,6 +940,9 @@ function awb_number_2go($order_id_main,$awb){
 */
 
 function cron_expire_stock(){
+		/*
+			Query all the allocated stock 
+		*/
 		$strtotime = strtotime("now");
 		$query = db_select('uc_stock_allocation', 'usa')
 		->fields('usa',array('order_id'))
@@ -829,8 +950,12 @@ function cron_expire_stock(){
 		->condition('usa.exp_time',$strtotime,'<')
 		->execute();
 		if($query->rowCount()>0):
-			
+			/*
+				query all the order and check the products infor 1 by 1
+			*/
 			 while($record = $query->fetchAssoc()) {
+				 
+				 //get order info uc_order_load() is ubercart module function
 				$order = uc_order_load($record['order_id']);
 				foreach($order->products as $key => $value):
 			 		stock_update_inventory("expire",$value->model,$value->qty);
@@ -984,7 +1109,9 @@ function cdv_ready($cdv){
 		}
 	}
 }
-
+/*
+	Checkout stock notification on summary page
+*/
 function stock_checker_notifaction_gateway($order_id){
 	$status = true;
 	$order = uc_order_load($order_id);
@@ -1009,7 +1136,9 @@ function stock_checker_notifaction_gateway($order_id){
 	return $return;
 }
 
-
+/*
+	JSON format for UI validation of stock
+*/
 function stock_checker_notifaction(){
 	if(isset($_REQUEST['qty']) && isset($_REQUEST['index'])){
 		$index_number = 0;
@@ -1030,8 +1159,9 @@ function stock_checker_notifaction(){
 	echo json_encode($array);	
 }
 
-
-
+/*
+	Validate your checkout if it has a stock.
+*/
 function stock_allocation_summary(){
 		$status = true;
 		$cartitems = uc_cart_get_contents();
@@ -1080,6 +1210,9 @@ function stock_allocation_validate($case,$order_id){
 	switch($case){
 		case "pending_bdo":
 		case "pending_creditcard":
+			/*
+				Stock allocate form BDO/Credit Card log
+			*/
 			$expire_time = ($case=="pending_bdo")?strtotime("+7 days"):strtotime("+1 hour");
 			$query = db_select("uc_stock_allocation","usa")
 			->fields("usa",array('stock_id'))
@@ -1108,6 +1241,9 @@ function stock_allocation_validate($case,$order_id){
 			endif;
 		break;	
 		case "failed":
+			/*
+				For Failure transaction
+			*/
 			$query = db_select("uc_stock_allocation","usa")
 			->fields("usa",array('stock_id'))
 			->condition("usa.order_id",$order_id)
@@ -1124,6 +1260,9 @@ function stock_allocation_validate($case,$order_id){
 			endif;
 		break;	
 		case "complete":
+			/*
+				For Complete transaction
+			*/
 			$query = db_select("uc_stock_allocation","usa")
 			->fields("usa",array('stock_id'))
 			->condition("usa.order_id",$order_id)
@@ -1149,7 +1288,9 @@ function stock_allocation_validate($case,$order_id){
 	}
 	
 }
-
+/*
+	Email Notification Stock notification
+*/
 function notification_email_trigger($zero_notication){
 	if(count($zero_notication)>0){
 		$body_include = '';
@@ -1170,6 +1311,9 @@ function notification_email_trigger($zero_notication){
 }
 
 function stock_update_inventory($case,$model,$order_quantity){
+	/*
+		Trigger behevior on inventory.
+	*/
 	$stock_zero_trigger = false;
 	$stockinfo = db_select("uc_product_stock","ups")->fields("ups",array("stock","allocated","threshold"))->condition("ups.sku",$model)->execute()->fetchObject();
 	switch($case){
@@ -1206,6 +1350,10 @@ function stock_update_inventory($case,$model,$order_quantity){
 }
 
 
+
+/*
+	Home Dashboard Template
+*/
 
 function portal_page(){
 	global $user;

@@ -16,6 +16,10 @@ function uc_smappliance_permission(){
 }
 
 
+/*
+	HOOK MENu
+*/
+
 function uc_smappliance_menu(){
 	$items = array();
 	$items['delete-smac/%'] = array(
@@ -103,6 +107,10 @@ function uc_smappliance_menu(){
 	return $items;
 }
 
+
+/*
+	function for forgot passsword Trigger in Dashboard "Members Profile"
+*/
 function forgot_password_email(){
 	global $user;
 	$arrayroles = array(3,14,19,12);
@@ -367,7 +375,7 @@ function _uc_change_email_form_submit(&$form, &$form_state){
 
 }
 
-
+//
 function _add_smac_form($form, &$form_state){
 	drupal_add_css(drupal_get_path('module','uc_smappliance').'/account.css');
 	drupal_add_js(drupal_get_path('module','uc_smappliance').'/js/transfer.js');
@@ -537,7 +545,9 @@ function _add_smac_form($form, &$form_state){
   	return $form;
 }
 
-// save function
+/*
+	FORM API TEMPLATE FOR add SMAC
+*/
 function _add_smac_form_submit($form, &$form_state){
 	global $user;
 	$account = user_load($user->uid);
@@ -586,6 +596,10 @@ function _add_smac_form_submit($form, &$form_state){
 	}
 }
 //-------------------------------------------------
+
+/*
+	FORM API TEMPLATE FOR edit SMAC
+*/
 function _edit_smac_form($form, &$form_state){
 	drupal_add_css(drupal_get_path('module','uc_smappliance').'/account.css');
 	drupal_add_js(drupal_get_path('module','uc_smappliance').'/js/transfer.js'); 

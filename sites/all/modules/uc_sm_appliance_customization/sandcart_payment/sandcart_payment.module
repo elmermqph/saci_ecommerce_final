@@ -1,4 +1,10 @@
 <?php
+/*
+	This Module is for Payment Gateway for BDO Transaction.  before you browse this module you mush have knowledge of the ff.
+		- Implementing how to integrate payment method on drupal ubercart
+		- familiarize how to use ubercart native function
+*/
+
 
 /**
  * Implements hook_permission().
@@ -43,7 +49,9 @@ function sandcart_payment_mail($key, &$message, $params) {
 }
 
 
-
+/*
+	HOok Menu Drupal
+*/
 
 function sandcart_payment_menu(){
 	$items['bdo/complete'] = array(
@@ -70,6 +78,10 @@ function sandcart_payment_menu(){
 	return $items;
 }
 
+
+/*
+	its a hook format for payment method ubercart 
+*/
 function sandcart_payment_uc_payment_method() {
   $methods[] = array(
     'id' => 'sandcart_payment',
@@ -91,7 +103,7 @@ function sandcart_payment_uc_payment_method_callback($op, &$order){
 		}
 	}
 }
-
+//------------------------------------------------------------------
 
 /*
  * Sample Settings Page
@@ -129,6 +141,10 @@ function sandcart_payment_form_uc_cart_checkout_review_form_alter(&$form, &$form
         }
     }
 }
+/*
+	Alter Form  API Template in summary page if you choose BDO transaction
+*/
+
 function sandcart_payment_form($form, &$form_state, $order){
 		$form['order_id'] = array("#type" => 'hidden',"#value" => $order->order_id);
 		$form['submit'] = array(
@@ -138,11 +154,23 @@ function sandcart_payment_form($form, &$form_state, $order){
 		return $form;
 }	
 
+
+/*
+	PROCESS on creating CSV
+*/
 function sandcart_payment_form_submit($form, &$form_state){
+	//stock allocated
    	stock_allocation_validate("pending_bdo",$form_state['values']['order_id']);
+	
+	
+	//get order info uc_order_load() is ubercart module function	
     $order = uc_order_load($form_state['values']['order_id']);
     $order->order_status = "pending";
     uc_order_save($order);
+	
+	/*
+		FORMAT FOR GENERATE CDV NUMBER
+	*/
 	$qry = "SELECT MAX(sequence) FROM sandcart_payment_seq WHERE sandcart_date = :sandcart_date";
     $topad = db_query($qry,array(":sandcart_date" => date("md")))->fetchField();
     if(empty($topad)){
@@ -170,10 +198,23 @@ function sandcart_payment_form_submit($form, &$form_state){
             $ctr = 2;
         }
     }
-   
+   	
     $bdo_smac = !empty($_SESSION['test-card']) ? $_SESSION['test-card'] : 0;
    
     $ccd = $result % 10;
+	
+	  $insert_bdo_seq = db_insert('sandcart_payment_seq')
+                    ->fields(array(
+                        'sandcart_date' => date('md'),
+                        'sequence' => $topad,
+                        'order_id' => $order->order_id,
+                    ))->execute();
+	
+	/*
+		------------------------------------------
+	*/
+	
+	//LOG CDV on this table
     $insert_bdo_transaction = db_insert('sandcart_payment_bdo')
                     ->fields(array(
                         'order_id' => $order->order_id,
@@ -183,12 +224,7 @@ function sandcart_payment_form_submit($form, &$form_state){
                     ))
                     ->execute();
    
-    $insert_bdo_seq = db_insert('sandcart_payment_seq')
-                    ->fields(array(
-                        'sandcart_date' => date('md'),
-                        'sequence' => $topad,
-                        'order_id' => $order->order_id,
-                    ))->execute();
+  
    
    
     $order_ref = array(
@@ -204,8 +240,12 @@ function sandcart_payment_form_submit($form, &$form_state){
     );
 }
 
-
+/*
+	Final Landing Page for BDO Payment Gateway Page
+*/
 function sandcart_payment_bdo_complete($cart_id = 0){
+	
+	
 	$order_ref = isset($_GET['order-ref']) ? $_GET['order-ref'] : '';
 	$order_id = isset($_GET['order-id']) ? $_GET['order-id'] : '';
 	$order_date = isset($_GET['tDate']) ? $_GET['tDate'] : '';
@@ -219,7 +259,9 @@ function sandcart_payment_bdo_complete($cart_id = 0){
 	
 	$NewDate = date('F d, Y', strtotime(date('Y-m-d, Y',$order_date) . "+ 7 days"));
 	$time = date('g:i A');
-	
+	/*
+		Template
+	*/
 	$output = '';
 	$output = "<span class='kindly' style='line-height: 15px; font-size: 10px'><p style='margin: 0;'>Kindly print and present this Order Summary at any BDO Remit office or remittance partner offering Kabayan Bills Bayad.</p>";
 	$output .= "<p style='margin: 0;'>You have until <strong>".$NewDate." 10:00pm (Philippine Time)</strong> to pay for your Order through BDO Remittance Centers</p></span> <br />";
@@ -397,6 +439,9 @@ function sandcart_payment_bdo_complete($cart_id = 0){
 	
 	
 	global $user;
+	/*
+		Trigger email for user
+	*/
 	$to = $user->mail;
 	$params['subject'] = "Your Order at SM Appliance Center";
 	$params['body'] = '<span style="font-size: 10px;">Hi ' .$user->name . '</span>, <br/><br />' . $output . $email_output . '<br /><br /><span style="font-size: 10px;">- SM Appliance Team</span>';

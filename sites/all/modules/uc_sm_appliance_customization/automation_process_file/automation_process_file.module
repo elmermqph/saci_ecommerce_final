@@ -1,4 +1,17 @@
 <?php 
+
+/*
+	Before you browse this module you mush have knowledge of the ff.
+		- how to use ubercart native function
+		- drupal default function
+			- node
+			- hooks
+			- taxonomy
+			- mail
+		- DOMPDF class library
+		- PHPExcel class library
+*/
+
 if(!defined("MMS_FILE_PATH_ROOT"))
 	define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
 /*
@@ -42,11 +55,19 @@ function automation_process_file_menu(){
 }
 
 
+/*
+	function trigger alert for IE lower version
+*/
 function browser_page_generate(){
 	print '<p>This site is best viewed in the latest browsers (i.e <a href="http://www.microsoft.com/en-us/download/details.aspx?id=43">Internet Explorer 8</a>, 
 		<a href="http://www.mozilla.org/en-US/firefox/new/">Mozilla Firefox 8</a>,<a href="https://www.google.com/intl/en/chrome/browser/">Google Chrome</a>). We recommend that you upgrade your web browser with the latest version.</p>';
 }
 
+
+
+/*
+	FORM api for Dashboard "Admin Settings"
+*/
 function configuration_settings($form, &$form_submit){
 	$form['invoice_details'] = array(
 		'#type' => 'fieldset', 
@@ -233,10 +254,17 @@ function configuration_settings($form, &$form_submit){
 	// $form;
 }
 
-
+/*
+	For Transamital Slip
+*/
 function saci_transmital_pdf($dategenerate,$cron_function=""){
 	global $base_root;
+	
 	$items_array = array();
+	
+	/*
+		View for transaction invoice only no awb nmumber
+	*/
 	$view = views_get_view('list_of_transaction');
     $view->set_display('page_invoice_only');
     $view->exposed_input['created']['value']['date'] = $dategenerate;
@@ -245,6 +273,7 @@ function saci_transmital_pdf($dategenerate,$cron_function=""){
 	
 	if(count($array)==0){
 		if($cron_function!=""){
+			//if no transaction it will generate a pdf format
 			$elements = no_transmital_pdf_generator($dategenerate);	
 			$params = array('file'=>$elements['filepath']);
 			$attachment = array(
@@ -256,9 +285,14 @@ function saci_transmital_pdf($dategenerate,$cron_function=""){
 		$message_email = 'No Transaction as of '.date("F d, Y",strtotime($dategenerate));
 	}else{	
 		foreach($array as $order_value){
+				//get order info uc_order_load() is ubercart module function	
 			$order = uc_order_load($order_value->order_id);
+			
+			//check invoice table
 			$invoice = db_select("checkout_vat_inc","cvi")->fields("cvi",array("id"))->condition("cvi.order_id",$order_value->order_id)->execute()->fetchField();
 			$invoice ="423-".str_pad((int)$invoice, 10, "0", STR_PAD_LEFT);
+			
+			//set array for html format
 			foreach($order->products as $value){
 				$upc_barcode = db_select("field_data_field_barcode","fb")->fields("fb",array("field_barcode_value"))->condition("fb.entity_id",$value->nid)->execute()->fetchField();
 				if(isset($items_array['front'][$value->model] )){
@@ -274,6 +308,8 @@ function saci_transmital_pdf($dategenerate,$cron_function=""){
 				$items_array['body'][$invoice][$value->model]['awb'] = $order_value->uc_shipments_tracking_number;
 			}
 		}
+		
+		//convert array elements into html to DOMPDF that product files
 		$elements = transmital_pdf_generator($items_array,$dategenerate,$cron_function);	
 		$params = array('file'=>$elements['filepath']);
 		$attachment = array(
@@ -284,6 +320,12 @@ function saci_transmital_pdf($dategenerate,$cron_function=""){
 		$message_email = 'Automated Transmittal Slip & Packing List as of '.date("F d, Y",strtotime($dategenerate));
 	}
 	if($cron_function!=""){
+		
+		/*
+			if cron function is trigger it will generate a email.
+			drupal_mail() its a default function of drupal
+			
+		*/
 		$email = EMAIL_SACITRANSMITAL_TO;
 		$module = 'automation_process_file';
 		$key = 'key';
@@ -320,6 +362,10 @@ function saci_transmital_pdf($dategenerate,$cron_function=""){
 }
 
 function transmital_pdf_generator($items_array,$dategenerate,$cron=""){
+	
+	/*
+		HTML TEmplate for Transmital and set to pdf.
+	*/
 	$html = "";
 	$file_include = MMS_FILE_PATH_ROOT.drupal_get_path('module','mms_generator').'/dompdf/dompdf_config.inc.php';
 	require_once($file_include);
@@ -384,18 +430,28 @@ function transmital_pdf_generator($items_array,$dategenerate,$cron=""){
 	$html .= '</body></html>';
 	$filepath = MMS_FILE_PATH_ROOT."outbound/xend/";
 	$filename = "SACI_TRANSMITTAL_".date("mdY",strtotime($dategenerate)).".pdf";
+	
+	//if the transaction file format exist it will delete
 	if(file_exists($filepath.$filename))
 		unlink($filepath.$filename);
+		
+	//DOMPDF library	
 	$dompdf = new DOMPDF(); 
 	$dompdf->load_html($html);
 	$dompdf->set_paper("A3","landscape");
 	$dompdf->render();
 	$pdf = $dompdf->output();
+	
+	
 	$objectfile = file_put_contents($filepath.$filename, $pdf);
-		if($objectfile){
+	
+	if($objectfile){
 			if($cron!=""){
 				return array('filename'=>$filename,'filepath'=>$filepath.$filename);	
 			}else{
+				/*
+					Download Trigger
+				*/
 				header('Cache-Control: public');
 				header('Content-Type: application/pdf');
 				header('Content-Disposition: attachment; filename="'.$filename.'"');
@@ -411,6 +467,9 @@ function transmital_pdf_generator($items_array,$dategenerate,$cron=""){
 }
 
 function no_transmital_pdf_generator($dategenerate){
+	/*
+		HTML Template for DOM PDF.
+	*/
 	$html = "";
 	$file_include = MMS_FILE_PATH_ROOT.drupal_get_path('module','mms_generator').'/dompdf/dompdf_config.inc.php';
 	require_once($file_include);

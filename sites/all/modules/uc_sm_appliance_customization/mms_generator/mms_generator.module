@@ -1,4 +1,18 @@
 <?php 
+
+/*
+	Before you browse this module you mush have knowledge of the ff.
+		- how to use ubercart native function
+		- drupal default function
+			- node
+			- hooks
+			- taxonomy
+			- mail
+		- DOMPDF class library
+		- PHPExcel class library
+*/
+
+
 if(!defined("MMS_FILE_PATH_ROOT"))
 	define("MMS_FILE_PATH_ROOT",$_SERVER['DOCUMENT_ROOT']."/");
 /*
@@ -205,35 +219,41 @@ function csa_daily_sales(){
 }
 
 function csa_file_name($csafilename,$datenow,$cron="",$checksmoutbound=""){
+	//drupal global variable
 	global $base_root;
+	
 	require_once("object/classoutput.php");
 	$object = new MMS_CLASS;
+	
+	//general variable
 	$filepath = MMS_FILE_PATH_ROOT."outbound/zip_file/";
 	$tempcsvfilepath = MMS_FILE_PATH_ROOT."outbound/csa/csv/";
-	
-	
 	$zipfile = $filepath.$csafilename.".zip";
 	
-	
+	//if this function is called via cron it will add on paramater url on view.
 	if($cron!=""){
 		$parameteraddcron = "&typecron_check=1";
 	}else{
 		$parameteraddcron = "";
 	}
 	
+	//if the file on the directory is exist it will delete so they can create a new format
 	if(file_exists($zipfile)){
 		unlink($zipfile);
 	}
-	
 	if(file_exists($tempcsvfilepath.$csafilename.".csv")){
 		unlink($tempcsvfilepath.$csafilename.".csv");
 	}
+	
+	//this is a view url page. <saci website>/csa_report_fetch.csv?created%5Bvalue%5D%5Bdate%5D= [datenow]
 	if(file_put_contents($tempcsvfilepath.$csafilename.".csv",file_get_contents($base_root."/csa_report_fetch.csv?created%5Bvalue%5D%5Bdate%5D=".urlencode($datenow).$parameteraddcron))){
+		//preparing files for compress
 		$filesystemcheck = array($tempcsvfilepath.$csafilename.".csv");
 		$object->zip_file_compressor($filesystemcheck,$zipfile,true,$tempcsvfilepath);
 		if(file_exists($zipfile)){
 			if($cron!=""){
 				if($checksmoutbound!=""){
+					//if the variable has value it will upload on this FTP ACCESS
 					$ftp_server = "10.101.1.98"; 
 					$ftp_user_name = "saciftp";
 					$ftp_user_pass = "saciftp";
@@ -253,6 +273,8 @@ function csa_file_name($csafilename,$datenow,$cron="",$checksmoutbound=""){
 					}else{
 						ftp_close($conn_id);
 						fclose($fp);
+						
+						//add log on zip
 						$nid = db_insert('z_report_logs')->fields(array(
 							'filename' => $zipfile,
 							'start_datetime' => 0,
@@ -288,9 +310,7 @@ function csa_file_name($csafilename,$datenow,$cron="",$checksmoutbound=""){
 function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
 	global $base_root;
 	$filenamecheck = "C0370423".date("mdy",strtotime($dateformat))."1";
-	/*
-		View query on this view on this url 	<SM APPLIANCE Website> /admin/structure/views/view/list_of_transaction/edit
-	*/
+	//View query on this view on this url 	<SM APPLIANCE Website> /admin/structure/views/view/list_of_transaction/edit
 	$view = views_get_view('order_productlist'); 
 	$view->set_display('page_validation_result'); 
 	$view->exposed_input['created']['value']['date'] = $dateformat;
@@ -301,10 +321,10 @@ function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
 	
 	while($completegeneratereport == false){
 		if(count($view->result)>0){
-			/*
-			
-			*/
+			//if there's a transaction it will get the file name format.
 			$statusprint =  csa_file_name($filenamecheck,$dateformat,$cron,$checksmoutbound);
+			
+			
 			if($statusprint=="Complete"){
 				if(file_exists($_SERVER['DOCUMENT_ROOT']."/outbound/zip_file/".$filenamecheck.".zip")){
 					$statusreturn['status'] = "Complete";
@@ -318,6 +338,7 @@ function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
 			$completegeneratereport = true;
 		}else if(count($view->result)==0){
 			if($cron!=""){
+				//
 				$email = EMAIL_NOTIFY;
 				$module = 'mms_generator';
 				$key = 'key';
@@ -368,6 +389,11 @@ function csa_compress_file_check($dateformat,$cron="",$checksmoutbound=""){
 	return $statusreturn ;
 }
 
+
+/*
+*
+*	THIS is old script for MMS.
+*/
 function mms_compress_file_check($dateformat,$urlparameter="",$statusmci=""){
 	if($urlparameter!=""){
 		$parameteraddcron = "&typecron_check=1";
@@ -503,19 +529,26 @@ function mms_compress_file_check($dateformat,$urlparameter="",$statusmci=""){
 }
 
 
-
+/*
+	This Function is to create invoice PDF Template
+*/
 function file_attachment_path($orderid){
 /*
-AWB
-					Number:<br />'.str_pad($awb['tracking_number'],9, "0", STR_PAD_LEFT).'
+	AWB Number:<br />'.str_pad($awb['tracking_number'],9, "0", STR_PAD_LEFT).'
 					
 */
+	//if file exist in a directory it will delete it
 	if(file_exists(MMS_FILE_PATH_ROOT."invoice/Sales Invoice_".$orderid.".pdf")){
 		unlink(MMS_FILE_PATH_ROOT."invoice/Sales Invoice_".$orderid.".pdf");
 	}
 	global $user;
+	
+	//fetch order details
 	$order = uc_order_load($orderid);
+	//fetch user 
 	$account = user_load($user->uid);
+	
+	//query all invoice info in this table
 	$query = db_query('SELECT id,payment_method,tin,smac_no FROM {checkout_vat_inc} WHERE order_id = :oid', array(':oid' => $orderid));
 	$recordinvoice = $query->fetchAssoc();
 	$paymentmethod = $recordinvoice['payment_method'];	
@@ -523,6 +556,8 @@ AWB
 	$smacnumber = (!empty($recordinvoice['smac_no']))?substr($recordinvoice['smac_no'],0,4)."-".substr($recordinvoice['smac_no'],4,4)."-".substr($recordinvoice['smac_no'],8,4)."-".substr($recordinvoice['smac_no'],12,4):'N/A';
 	$object = db_query("SELECT tracking_number FROM uc_shipments WHERE order_id = :oid",array(':oid' => $orderid));
 	$awb = $object->fetchAssoc();
+	
+	//fetch bdo transaction info if any.
 	$dbquerysearchprice = db_select("sandcart_saci_delivery","scd")
 		->fields("scd")
 		->condition("scd.order_id",$orderid)
@@ -531,6 +566,8 @@ AWB
 	require_once("dompdf/dompdf_config.inc.php");
 	$filepath = MMS_FILE_PATH_ROOT."invoice/";
 	$mainfile = "sample_".$orderid.".pdf";
+	
+	//template for pdf
 	$html ='<html><body>';
 	$html .='<table width="100%">
 				<tr>
@@ -657,6 +694,9 @@ AWB
 	';
 	
 	$html .='</body></html>';
+	
+	
+	//DOMPDF is a Class library that convert html to pdf
 	$dompdf = new DOMPDF(); 
 	$dompdf->load_html($html);
 	$dompdf->set_paper("A3","landscape");
@@ -737,11 +777,16 @@ function number_to_words_two($number)
 }
 
 function hashtotal($dategenerate){
+	//drupal global variable
 	global $base_root;
 	require_once("dompdf/dompdf_config.inc.php");
+	
+	//variable use
 	$filepath = MMS_FILE_PATH_ROOT."outbound/bir/";
 	$filename = "000086204S".date('mY',strtotime($dategenerate))."H.pdf";
 	$arrayamount = array('vatable_sales'=>0.00,'vat_amt'=>0.00);
+	
+	//drupal view render as array. 
 	$view = views_get_view('order_productlist');  
 	$view->set_display('page_2');
 	$view->exposed_input['created']['value']['date'] = $dategenerate;
@@ -749,13 +794,18 @@ function hashtotal($dategenerate){
 	$array = $view->result;
 	$countrow = 0;
 	foreach ($array as $value):
+		//check the invoice database to get certain info on specific order
 		$object = db_query("SELECT vat_amt,vatable_sale FROM checkout_vat_inc WHERE order_id = :oid",array(':oid' => $value->order_id));
-                $record = $object->fetchAssoc(); 
+        $record = $object->fetchAssoc(); 
 		if($object->rowCount()>0)
 		      $countrow++;	
 		$arrayamount['vatable_sales'] += $record['vatable_sale']; 
         $arrayamount['vat_amt'] += $record['vat_amt'];         
 	endforeach;	
+	
+	/*
+		Generate Email Template	
+	*/
 	$html ='<html><body>';
 	$html .='<table width="100%">';
 	$html .='<thead><tr><th style="text-align:right;" colspan="2"><p style="margin:0px;">Extraction Date: '.date("m/d/Y").'</p><p style="margin:0px;">Extraction Time: '.date("H:i:s").'</p></th></tr><tr><th style="text-align:center;" colspan="2"><h4 style="margin:0px;">Sales List Summary (SLS) Hash Total Report</h4><p style="margin:0px;">For the Month of '.date('F Y',strtotime($dategenerate)).'</p></th></tr>
@@ -763,6 +813,8 @@ function hashtotal($dategenerate){
 	$html .='</table>';
 	$html .='</body></html>';
 	
+	
+	//call DOMPDF library
 	$dompdf = new DOMPDF(); 
 	$dompdf->load_html($html);
 	$dompdf->set_paper("A3","landscape");
@@ -770,10 +822,15 @@ function hashtotal($dategenerate){
 	//$dompdf->stream($filename);
 	
 	$pdf = $dompdf->output();
+	//if the file on a certain directory exist.
 	if(file_exists("outbound/bir/".$filename))
 		unlink("outbound/bir/".$filename);
+		
+	//create new pdf file	
 	$objectfile = file_put_contents($filepath.$filename, $pdf);
+	
 	if($objectfile){
+		//if this is from the dashboard it will direct download on it.
 		header('Cache-Control: public');
 		header('Content-Type: application/pdf');
 		header('Content-Disposition: attachment; filename="'.$filename.'"');
@@ -888,6 +945,14 @@ function sls_to_dat($datenow){
 	}
 	return $return;
 }
+
+
+/*
+	Transmittal Slip and Packing List Report 
+	From Xend but we didn't use this for now because we change the to 2GO
+
+
+*/
 
 function xend_to_excel($datenow,$cronchecker=""){
 	global $base_root;
@@ -1246,6 +1311,7 @@ function transaction_check($dategenerate){
 }
 
 function sku_update_patch_select($date,$status,$id,$nodeid,$action=""){
+	//its a dashboard that identify if the certain action will use.
     global $base_root;
     if($status==1){
         return "Implemented";
@@ -1258,16 +1324,25 @@ function sku_update_patch_select($date,$status,$id,$nodeid,$action=""){
 }
 
 function changeprice_skuproduts($nodeid,$skuupdateid){
+		//get the id of price change.
         $querystring = db_query('SELECT price FROM z_price_update WHERE id = :id', array(':id' => $skuupdateid));
         if($querystring->rowCount()>0){
+			//since the price isn't decimal places.
             foreach($querystring as $value){
                 $priceget = $value->price/100;
             }
             
+			/*
+				load all the product details using product id
+				node: node_load() is a native drupal function.
+			*/
             $newNode = node_load($nodeid);
+
             $newNode->changed = strtotime("now");
             $newNode->sell_price = $priceget;
             $nodesave = node_save($newNode);
+			
+			//after update in drupal it will update the price table.
             $num_updated = db_update('z_price_update')
             ->fields(array('status' => 1))
             ->condition('id',$skuupdateid)
@@ -1282,11 +1357,16 @@ function changeprice_skuproduts($nodeid,$skuupdateid){
 }
 
 function cron_sku_update_check($datenow){
+	
+	//check all the list for price update
     $querystring = db_query('SELECT id,nodeid FROM z_price_update WHERE
     activedate <= :date AND status = 0 ORDER BY timesavenow ASC', array(':date' => $datenow));
+	
+	
     if($querystring->rowCount()>0){
+		//if there's a schedule for price change.
         foreach($querystring as $value){
-            changeprice_skuproduts($value->nodeid,$value->id);
+			changeprice_skuproduts($value->nodeid,$value->id);
         }
         return "Complete";
     }else{
